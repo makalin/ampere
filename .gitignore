@@ -7,11 +7,18 @@ Cargo.lock
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
 !*.xcodeproj/xcshareddata/
+*.xcodeproj/xcuserdata/
 *.xcworkspace/*
 !*.xcworkspace/contents.xcworkspacedata
+*.xcworkspace/xcuserdata/
 .DS_Store
 build/
 DerivedData/
+*.app/
+*.app.dSYM/
+*.ipa
+*.dSYM.zip
+*.dSYM
 
 # Windows
 bin/
