@@ -1,0 +1,3 @@
+var srcIndex = new Map(JSON.parse('[["libc",["",[["new",[],["mod.rs"]],["unix",[["bsd",[["apple",[["b64",[["x86_64",[],["mod.rs"]]],["mod.rs"]]],["mod.rs"]]],["mod.rs"]]],["mod.rs"]]],["lib.rs","macros.rs","primitives.rs","types.rs"]]],["serde_core",["",[["de",[],["ignored_any.rs","impls.rs","mod.rs","value.rs"]],["private",[],["content.rs","doc.rs","mod.rs","seed.rs","size_hint.rs","string.rs"]],["ser",[],["fmt.rs","impls.rs","impossible.rs","mod.rs"]]],["crate_root.rs","format.rs","lib.rs","macros.rs"]]],["unicode_ident",["",[],["lib.rs","tables.rs"]]]]'));
+createSrcSidebar();
+//{"start":36,"fragment_lengths":[199,276,49]}

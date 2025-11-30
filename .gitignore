@@ -1,0 +1,49 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# macOS
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+.DS_Store
+build/
+DerivedData/
+
+# Windows
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+.vs/
+
+# UniFFI generated files
+**/Bindings/*.swift
+**/Bindings/*.cs
+**/Bindings/*.h
+**/Bindings/*.c
+*.udl.bak
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+*.dylib
+*.dll
+*.so
+*.a
+*.lib
+
+# Logs
+*.log
+

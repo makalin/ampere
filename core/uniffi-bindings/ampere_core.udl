@@ -1,0 +1,31 @@
+namespace ampere_core {
+    enum PlayerState {
+        stopped;
+        playing;
+        paused;
+    };
+
+    interface AudioPlayer {
+        constructor();
+        void load_file(string path);
+        void play();
+        void pause();
+        void stop();
+        PlayerState get_state();
+        void set_volume(float volume);
+        float get_volume();
+        string? get_current_file();
+        boolean is_finished();
+        void seek(double position);
+        double get_position();
+        double? get_duration();
+        float get_eq_band(u8 band);
+        void set_eq_band(u8 band, float gain);
+        void reset_eq();
+        void set_eq_enabled(boolean enabled);
+        boolean is_eq_enabled();
+        void add_to_playlist(string path);
+        void play_next();
+        void play_previous();
+    };
+};

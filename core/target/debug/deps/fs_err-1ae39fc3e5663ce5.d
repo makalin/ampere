@@ -1,0 +1,12 @@
+/Users/makalin/Public/htdocs/ampere/core/target/debug/deps/fs_err-1ae39fc3e5663ce5.d: /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/lib.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/dir.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/errors.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/file.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/open_options.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/os.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/os/unix.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/path.rs
+
+/Users/makalin/Public/htdocs/ampere/core/target/debug/deps/libfs_err-1ae39fc3e5663ce5.rmeta: /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/lib.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/dir.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/errors.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/file.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/open_options.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/os.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/os/unix.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/path.rs
+
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/lib.rs:
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/dir.rs:
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/errors.rs:
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/file.rs:
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/open_options.rs:
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/os.rs:
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/os/unix.rs:
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fs-err-2.11.0/src/path.rs:

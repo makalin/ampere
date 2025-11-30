@@ -1,0 +1,10 @@
+/Users/makalin/Public/htdocs/ampere/core/target/debug/deps/uniffi_meta-8d082c4f0ad07062.d: /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/lib.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/ffi_names.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/group.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/reader.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/types.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/metadata.rs
+
+/Users/makalin/Public/htdocs/ampere/core/target/debug/deps/libuniffi_meta-8d082c4f0ad07062.rmeta: /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/lib.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/ffi_names.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/group.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/reader.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/types.rs /Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/metadata.rs
+
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/lib.rs:
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/ffi_names.rs:
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/group.rs:
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/reader.rs:
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/types.rs:
+/Users/makalin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uniffi_meta-0.30.0/src/metadata.rs:
