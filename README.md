@@ -25,6 +25,7 @@ Ampere is a professional-grade audio player for macOS featuring an authentic Win
 - ✅ **Random Play**: Shuffle mode for random track order
 - ✅ **Normal Play**: Play once through playlist (Repeat Mode: None)
 - ✅ **Auto-advance**: Automatically plays next track when current ends
+- ✅ **Crossfade**: Smooth transitions between tracks (0-10 seconds)
 
 ### Equalizer & Audio Processing
 - ✅ **10-Band Equalizer**: -12dB to +12dB per band
@@ -43,6 +44,10 @@ Ampere is a professional-grade audio player for macOS featuring an authentic Win
 - ✅ **Channel Support**: 
   - Stereo, Mono, Surround modes
   - Balance control (-1.0 to +1.0)
+- ✅ **ReplayGain Support**: 
+  - Track gain, Album gain, Auto mode
+  - Pre-amp adjustment (-20dB to +20dB)
+  - Automatic volume normalization
 
 ### Playlist Management
 - ✅ **Playlist Persistence**: Remembers last played track, repeat/shuffle modes
@@ -73,6 +78,14 @@ Ampere is a professional-grade audio player for macOS featuring an authentic Win
   - Discovery boost for new tracks
 - ✅ **Daily Playlist Export**: Export suggested playlists as M3U files
 - ✅ **Smart Recommendations**: Based on play count, recency, time patterns
+
+### Analytics & Statistics
+- ✅ **Listening Analytics**: Comprehensive listening statistics
+  - Total tracks played, unique tracks, listening time
+  - Top tracks, genres, and artists
+  - Listening patterns by hour and day
+  - Session tracking and completion rates
+  - Play count and average play time per track
 
 ### Automation & Extensibility
 - ✅ **JavaScript Automation**: Full scripting support for player control
@@ -311,6 +324,26 @@ To enable online search and playlist import/export, edit `macos/Ampere/Ampere/On
    - **OFF**: Play in order
    - **ON**: Play in random order
 
+### Crossfade
+
+1. Click **SET** button to open settings
+2. Go to **Audio** tab
+3. Enable **Crossfade**
+4. Adjust **Duration** slider (0-10 seconds)
+5. Tracks will smoothly fade out and fade in when transitioning
+
+### ReplayGain
+
+1. Click **SET** button
+2. Go to **Audio** tab
+3. Select **ReplayGain Mode**:
+   - **Off**: No normalization
+   - **Track**: Use track gain tags
+   - **Album**: Use album gain tags
+   - **Auto**: Automatically choose best mode
+4. Adjust **Pre-Amp** if needed (-20dB to +20dB)
+5. Volume is automatically adjusted based on ReplayGain tags in files
+
 ### Audio Effects
 
 1. Click **SET** button to open settings
@@ -391,6 +424,17 @@ To enable online search and playlist import/export, edit `macos/Ampere/Ampere/On
    - Displays lyrics from file metadata
    - Scrollable text view
 
+### Listening Analytics
+
+1. Click **SET** button
+2. Go to **Analytics** tab
+3. Click **View Analytics** to see:
+   - Overall statistics (total tracks, listening time, etc.)
+   - Top tracks by play count
+   - Top genres and artists
+   - Listening patterns (peak hours, day of week)
+4. Click **Reset Statistics** to clear all data
+
 ---
 
 ## 🔌 Plugin Development
@@ -452,10 +496,10 @@ Future features planned:
 - [ ] MIDI support
 - [ ] Network streaming (Shoutcast, Icecast)
 - [ ] Cloud sync (iCloud, Dropbox)
-- [ ] Advanced analytics (listening statistics)
+- [x] Advanced analytics (listening statistics) ✅
 - [ ] Social features (share playlists, recommendations)
-- [ ] Crossfade between tracks
-- [ ] ReplayGain support
+- [x] Crossfade between tracks ✅
+- [x] ReplayGain support ✅
 - [ ] CD ripping
 - [ ] Podcast support
 

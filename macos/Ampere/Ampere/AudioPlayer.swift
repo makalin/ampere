@@ -332,4 +332,9 @@ class AudioPlayer: NSObject, ObservableObject {
             }
         }
     }
+    
+    // Expose AVPlayer for crossfade and other advanced features
+    func getAVPlayer() -> AVPlayer? {
+        return player
+    }
 }

@@ -28,6 +28,9 @@ class PlayerViewModel: ObservableObject {
     let channelSettings: ChannelSettings
     let dailySuggestions: DailySuggestions
     var pluginManager: PluginManager!
+    let crossfadeManager: CrossfadeManager
+    let replayGainProcessor: ReplayGainProcessor
+    let listeningAnalytics: ListeningAnalytics
     
     var stateDescription: String {
         switch state {
@@ -49,6 +52,9 @@ class PlayerViewModel: ObservableObject {
         visualizer = AudioVisualizer()
         eqAnalyzer = RealTimeEQAnalyzer()
         channelSettings = ChannelSettings()
+        crossfadeManager = CrossfadeManager()
+        replayGainProcessor = ReplayGainProcessor()
+        listeningAnalytics = ListeningAnalytics()
         
         // Initialize daily suggestions (doesn't need self)
         dailySuggestions = DailySuggestions(playlist: newPlaylist)
@@ -111,15 +117,47 @@ class PlayerViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+        
+        // Observe track end notification
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("TrackDidFinish"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            // End analytics session
+            self.listeningAnalytics.endSession()
+            // Auto-play next track
+            self.handleTrackEnd()
+        }
     }
     
     private var cancellables = Set<AnyCancellable>()
     
     func loadFile(path: String) {
         do {
+            // End previous analytics session
+            if let currentPath = currentFile {
+                listeningAnalytics.endSession()
+            }
+            
             try player.loadFile(path: path)
             // Extract metadata
             metadata = MetadataExtractor.extractMetadata(from: path)
+            
+            // Extract ReplayGain from metadata
+            replayGainProcessor.extractReplayGain(from: metadata)
+            
+            // Apply ReplayGain volume adjustment
+            let volumeAdjustment = replayGainProcessor.calculateVolumeAdjustment()
+            if replayGainProcessor.mode != .off {
+                let adjustedVolume = volume * volumeAdjustment
+                try? player.setVolume(min(1.0, adjustedVolume))
+            }
+            
+            // Start new analytics session
+            listeningAnalytics.startSession(trackPath: path)
+            listeningAnalytics.updateGenreAndArtist(trackPath: path, genre: metadata.genre, artist: metadata.artist)
             
             // Update playlist current index if file is in playlist
             if let playlist = playlist {
@@ -137,10 +175,29 @@ class PlayerViewModel: ObservableObject {
     
     func loadFile(url: URL) {
         do {
+            // End previous analytics session
+            if let currentPath = currentFile {
+                listeningAnalytics.endSession()
+            }
+            
             try player.loadFile(url: url)
             
             // Extract metadata
             metadata = MetadataExtractor.extractMetadata(from: url.path)
+            
+            // Extract ReplayGain from metadata
+            replayGainProcessor.extractReplayGain(from: metadata)
+            
+            // Apply ReplayGain volume adjustment
+            let volumeAdjustment = replayGainProcessor.calculateVolumeAdjustment()
+            if replayGainProcessor.mode != .off {
+                let adjustedVolume = volume * volumeAdjustment
+                try? player.setVolume(min(1.0, adjustedVolume))
+            }
+            
+            // Start new analytics session
+            listeningAnalytics.startSession(trackPath: url.path)
+            listeningAnalytics.updateGenreAndArtist(trackPath: url.path, genre: metadata.genre, artist: metadata.artist)
             
             // Update playlist current index if file is in playlist
             if let playlist = playlist {
@@ -251,10 +308,26 @@ class PlayerViewModel: ObservableObject {
         }
         
         if let nextTrack = playlist.getNextTrack() {
-            loadFile(path: nextTrack.path)
-            // Small delay to ensure file is loaded before playing
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-                self?.play()
+            // If crossfade is enabled, fade out current track first
+            if crossfadeManager.enabled && crossfadeManager.duration > 0, 
+               let currentPlayer = player.getAVPlayer(), state == .playing {
+                crossfadeManager.startFadeOut(player: currentPlayer) { [weak self] in
+                    guard let self = self else { return }
+                    self.loadFile(path: nextTrack.path)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                        guard let self = self, let nextPlayer = self.player.getAVPlayer() else { return }
+                        // Fade in next track
+                        self.crossfadeManager.startFadeIn(player: nextPlayer) {
+                            // Fade in complete
+                        }
+                        self.play()
+                    }
+                }
+            } else {
+                loadFile(path: nextTrack.path)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                    self?.play()
+                }
             }
         }
     }

@@ -48,6 +48,8 @@ struct SettingsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         audioSection
+                        crossfadeSection
+                        replayGainSection
                         channelSection
                         effectsSection
                         spatialAudioSection
@@ -78,6 +80,17 @@ struct SettingsView: View {
                 }
                 .tabItem {
                     Text("Display")
+                }
+                
+                // Analytics Tab
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        analyticsSection
+                    }
+                    .padding(8)
+                }
+                .tabItem {
+                    Text("Analytics")
                 }
             }
             .background(Color(red: 0.15, green: 0.15, blue: 0.2))
@@ -171,6 +184,77 @@ struct SettingsView: View {
                 set: { viewModel.setVolume(Float($0)) }
             ), in: 0...1)
             .tint(Color(red: 0.0, green: 1.0, blue: 0.0))
+        }
+    }
+    
+    private var crossfadeSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("CROSSFADE")
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .foregroundColor(.white)
+            
+            Toggle("Enable Crossfade", isOn: Binding(
+                get: { viewModel.crossfadeManager.enabled },
+                set: { viewModel.crossfadeManager.setEnabled($0) }
+            ))
+            .toggleStyle(.switch)
+            .tint(Color(red: 0.0, green: 1.0, blue: 0.0))
+            
+            if viewModel.crossfadeManager.enabled {
+                HStack {
+                    Text("Duration:")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text(String(format: "%.1fs", viewModel.crossfadeManager.duration))
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(.white)
+                }
+                
+                Slider(value: Binding(
+                    get: { viewModel.crossfadeManager.duration },
+                    set: { viewModel.crossfadeManager.setDuration($0) }
+                ), in: 0...10)
+                .tint(Color(red: 0.0, green: 1.0, blue: 0.0))
+            }
+        }
+    }
+    
+    private var replayGainSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("REPLAYGAIN")
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .foregroundColor(.white)
+            
+            Picker("Mode", selection: Binding(
+                get: { viewModel.replayGainProcessor.mode },
+                set: { viewModel.replayGainProcessor.setMode($0) }
+            )) {
+                Text("Off").tag(ReplayGainMode.off)
+                Text("Track").tag(ReplayGainMode.track)
+                Text("Album").tag(ReplayGainMode.album)
+                Text("Auto").tag(ReplayGainMode.auto)
+            }
+            .pickerStyle(.menu)
+            .tint(Color(red: 0.0, green: 1.0, blue: 0.0))
+            
+            if viewModel.replayGainProcessor.mode != .off {
+                HStack {
+                    Text("Pre-Amp:")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text(String(format: "%.1f dB", viewModel.replayGainProcessor.preAmp))
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(.white)
+                }
+                
+                Slider(value: Binding(
+                    get: { viewModel.replayGainProcessor.preAmp },
+                    set: { viewModel.replayGainProcessor.setPreAmp($0) }
+                ), in: -20...20)
+                .tint(Color(red: 0.0, green: 1.0, blue: 0.0))
+            }
         }
     }
     
@@ -309,6 +393,35 @@ struct SettingsView: View {
     }
     
     @State private var showingPlugins = false
+    @State private var showingAnalytics = false
+    
+    private var analyticsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("LISTENING STATISTICS")
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .foregroundColor(.white)
+            
+            Button(action: { showingAnalytics = true }) {
+                HStack {
+                    Text("View Analytics")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8))
+                        .foregroundColor(.gray)
+                }
+                .padding(4)
+                .background(Color(red: 0.2, green: 0.2, blue: 0.25))
+                .cornerRadius(2)
+            }
+            .buttonStyle(.plain)
+            .sheet(isPresented: $showingAnalytics) {
+                AnalyticsView()
+                    .environmentObject(viewModel)
+            }
+        }
+    }
 }
 
 struct EffectsPanelView: View {

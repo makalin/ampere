@@ -19,6 +19,7 @@ struct AudioMetadata {
     var duration: Double?
     var albumArt: NSImage?
     var lyrics: String?
+    var customTags: [String: String] = [:] // For ReplayGain and other custom tags
 }
 
 class MetadataExtractor {
@@ -81,6 +82,20 @@ class MetadataExtractor {
                     for item in metadataItems {
                         if let key = item.key as? String, (key == "USLT" || key == "lyrics") {
                             metadata.lyrics = try? await item.load(.stringValue)
+                        }
+                        
+                        // Extract ReplayGain tags
+                        if let key = item.key as? String {
+                            if key == "REPLAYGAIN_TRACK_GAIN" || key == "replaygain_track_gain" {
+                                if let value = try? await item.load(.stringValue) {
+                                    metadata.customTags["REPLAYGAIN_TRACK_GAIN"] = value
+                                }
+                            }
+                            if key == "REPLAYGAIN_ALBUM_GAIN" || key == "replaygain_album_gain" {
+                                if let value = try? await item.load(.stringValue) {
+                                    metadata.customTags["REPLAYGAIN_ALBUM_GAIN"] = value
+                                }
+                            }
                         }
                     }
                 }
