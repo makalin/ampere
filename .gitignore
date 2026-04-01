@@ -1,9 +1,9 @@
-# Rust
-/target/
+# ─── Rust ────────────────────────────────────────────────────────────────────
+target/
 **/*.rs.bk
 Cargo.lock
 
-# macOS
+# ─── macOS ───────────────────────────────────────────────────────────────────
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
 !*.xcodeproj/xcshareddata/
@@ -20,7 +20,7 @@ DerivedData/
 *.dSYM.zip
 *.dSYM
 
-# Windows
+# ─── Windows ─────────────────────────────────────────────────────────────────
 bin/
 obj/
 *.user
@@ -30,27 +30,30 @@ obj/
 *.userprefs
 .vs/
 
-# UniFFI generated files
+# ─── UniFFI generated files ───────────────────────────────────────────────────
 **/Bindings/*.swift
 **/Bindings/*.cs
 **/Bindings/*.h
 **/Bindings/*.c
 *.udl.bak
 
-# IDE
+# ─── IDE ─────────────────────────────────────────────────────────────────────
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
 
-# Build artifacts
+# ─── Build artifacts / binaries ───────────────────────────────────────────────
 *.dylib
 *.dll
 *.so
 *.a
 *.lib
+*.exe
+*.pdb
 
-# Logs
+# ─── Logs & temp files ────────────────────────────────────────────────────────
 *.log
-
+*.tmp
+*.bak

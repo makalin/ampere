@@ -1,1 +1,0 @@
-std::option::Option<cpal::host::coreaudio::macos::property_listener::AudioObjectPropertyListener>
