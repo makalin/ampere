@@ -21,6 +21,29 @@ class PlayerViewModel: ObservableObject {
     @Published var spectrumData: [Float] = Array(repeating: 0.0, count: 20)
     @Published var eqSpectrumData: [Float] = Array(repeating: 0.0, count: 10)
     
+    // EQ Presets
+    struct EQPreset: Identifiable, Hashable {
+        let id = UUID()
+        let name: String
+        let gains: [Float] // 10 bands
+    }
+    
+    static let eqPresets: [EQPreset] = [
+        EQPreset(name: "Flat",         gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+        EQPreset(name: "Club",         gains: [0, 0, 2, 5, 5, 5, 2, 0, 0, 0]),
+        EQPreset(name: "Classical",    gains: [5, 3, 2, 2, 0, 0, 0, 2, 3, 4]),
+        EQPreset(name: "Dance",        gains: [9, 7.5, 4, 0, 0, -4, -6, -6, 0, 0]),
+        EQPreset(name: "Full Bass",    gains: [10, 10, 10, 8, 4, 0, -4, -8, -10, -10]),
+        EQPreset(name: "Full Treble",  gains: [-10, -10, -10, -8, -4, 4, 10, 12, 12, 14]),
+        EQPreset(name: "Laptop",       gains: [2.5, 7.5, 2.5, -4, -3, 0, 4, 7.5, 12, 12]),
+        EQPreset(name: "Large Hall",   gains: [9, 9, 4, 4, 0, -4, -4, -4, 0, 0]),
+        EQPreset(name: "Party",        gains: [6, 6, 0, 0, 0, 0, 0, 0, 6, 6]),
+        EQPreset(name: "Pop",          gains: [-2.5, 3.5, 6, 6, 4, -2, -3.5, -3.5, -2, -2]),
+        EQPreset(name: "Reggae",       gains: [0, 0, 0, -4, 0, 5, 5, 0, 0, 0]),
+        EQPreset(name: "Rock",         gains: [7, 4, -4.5, -7, -3, 3, 7, 9, 9, 9]),
+        EQPreset(name: "Techno",       gains: [7, 5, 0, -4, -4, 0, 7, 8, 8, 8])
+    ]
+    
     private var player: AudioPlayer
     private var eq: Equalizer
     private var visualizer: AudioVisualizer
@@ -282,6 +305,14 @@ class PlayerViewModel: ObservableObject {
     
     func isEQEnabled() -> Bool {
         return eq.isEnabled()
+    }
+    
+    func applyEQPreset(_ preset: EQPreset) {
+        for (index, gain) in preset.gains.enumerated() {
+            setEQBand(index: index, gain: gain)
+        }
+        // Force UI update for all bands
+        objectWillChange.send()
     }
     
     // Playlist Methods

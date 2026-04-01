@@ -24,7 +24,7 @@ struct WindowAccessor: NSViewRepresentable {
                 window.styleMask = [.borderless, .fullSizeContentView]
                 window.isOpaque = false
                 window.backgroundColor = .clear
-                window.hasShadow = true // Enable shadow for better visual depth
+                window.hasShadow = false // Disable aggregate shadow to avoid dark outlines around multi-window layouts
                 window.isMovableByWindowBackground = true
                 window.titlebarAppearsTransparent = true
                 window.titleVisibility = .hidden

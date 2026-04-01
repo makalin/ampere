@@ -2,7 +2,8 @@
 //  ContentView.swift
 //  Ampere
 //
-//  Main content view with Winamp-style windows
+//  Main content view with Winamp-style windows.
+//  Skin changes propagate through .applySkin() modifier.
 //
 
 import SwiftUI
@@ -12,66 +13,75 @@ import AppKit
 struct ContentView: View {
     @EnvironmentObject var viewModel: PlayerViewModel
     @EnvironmentObject var themeManager: ThemeManager
-    @State private var showingEQ = false
-    @State private var showingPlaylist = false
+
+    // Persist panel open/closed state across launches
+    @AppStorage("showingEQ")       private var showingEQ       = false
+    @AppStorage("showingPlaylist") private var showingPlaylist = false
+    @AppStorage("showingAlbumArt") private var showingAlbumArt = false
+
     @State private var showingSettings = false
-    @State private var showingAlbumArt = false
-    @State private var showingLyrics = false
-    @State private var showingSearch = false
-    
+    @State private var showingLyrics   = false
+    @State private var showingSearch   = false
+
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            // Main player window
-            WinampPlayerView(showingEQ: $showingEQ, showingPlaylist: $showingPlaylist, showingSettings: $showingSettings, showingAlbumArt: $showingAlbumArt, showingLyrics: $showingLyrics, showingSearch: $showingSearch)
+        VStack(alignment: .leading, spacing: 0) {
+            // ── Top row: player + optional right panel ──────────────────────
+            HStack(alignment: .top, spacing: 0) {
+                WinampPlayerView(
+                    showingEQ:       $showingEQ,
+                    showingPlaylist: $showingPlaylist,
+                    showingSettings: $showingSettings,
+                    showingAlbumArt: $showingAlbumArt,
+                    showingLyrics:   $showingLyrics,
+                    showingSearch:   $showingSearch
+                )
                 .environmentObject(viewModel)
-                .zIndex(1)
-            
-            // Additional windows - positioned relative to main window
-            if showingEQ {
-                WinampEQWindow(isPresented: $showingEQ)
-                    .environmentObject(viewModel)
-                    .offset(x: 280, y: 0)
-                    .zIndex(2)
+                .layoutPriority(1)
+
+                if showingEQ {
+                    WinampEQWindow(isPresented: $showingEQ)
+                        .environmentObject(viewModel)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                } else if showingAlbumArt {
+                    WinampAlbumArtWindow(isPresented: $showingAlbumArt)
+                        .environmentObject(viewModel)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                } else if showingSettings {
+                    SettingsView(isPresented: $showingSettings)
+                        .environmentObject(viewModel)
+                        .environmentObject(themeManager)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                } else if showingSearch {
+                    SearchView(isPresented: $showingSearch)
+                        .environmentObject(viewModel)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
             }
-            
+
+            // ── Bottom: playlist / lyrics panel ────────────────────────────
             if showingPlaylist {
                 WinampPlaylistWindow(isPresented: $showingPlaylist)
                     .environmentObject(viewModel)
-                    .offset(x: 0, y: 116)
-                    .zIndex(2)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            
-            if showingSettings {
-                SettingsView(isPresented: $showingSettings)
-                    .environmentObject(viewModel)
-                    .environmentObject(themeManager)
-                    .offset(x: 280, y: 0)
-                    .zIndex(3)
-            }
-            
-            if showingAlbumArt {
-                WinampAlbumArtWindow(isPresented: $showingAlbumArt)
-                    .environmentObject(viewModel)
-                    .offset(x: 280, y: 116)
-                    .zIndex(2)
-            }
-            
+
             if showingLyrics {
                 WinampLyricsWindow(isPresented: $showingLyrics)
                     .environmentObject(viewModel)
-                    .offset(x: 0, y: 416)
-                    .zIndex(2)
-            }
-            
-            if showingSearch {
-                SearchView(isPresented: $showingSearch)
-                    .environmentObject(viewModel)
-                    .offset(x: 280, y: 0)
-                    .zIndex(4)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .frame(width: showingEQ || showingSettings ? 600 : 275, 
-               height: showingPlaylist ? 416 : (showingSettings ? 500 : 116))
+        .fixedSize()
+        .clipped()
+        // Apply skin to the entire tree so AmpColor._skin stays in sync
+        .applySkin(themeManager)
+        .animation(.easeInOut(duration: 0.18), value: showingEQ)
+        .animation(.easeInOut(duration: 0.18), value: showingPlaylist)
+        .animation(.easeInOut(duration: 0.18), value: showingAlbumArt)
+        .animation(.easeInOut(duration: 0.18), value: showingSettings)
+        .animation(.easeInOut(duration: 0.18), value: showingLyrics)
+        .animation(.easeInOut(duration: 0.18), value: showingSearch)
+        .animation(.easeInOut(duration: 0.25), value: themeManager.activeTheme)
         .borderlessWindow()
     }
 }

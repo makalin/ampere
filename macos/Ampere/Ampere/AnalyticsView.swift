@@ -160,7 +160,7 @@ struct AnalyticsView: View {
                 .foregroundColor(.gray)
             Spacer()
             Text(value)
-                .font(.system(size: 8, design: .monospaced, weight: .bold))
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
                 .foregroundColor(.white)
         }
     }

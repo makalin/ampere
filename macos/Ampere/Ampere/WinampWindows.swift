@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import Combine
 import UniformTypeIdentifiers
 
 // ─── MARK: Shared Winamp Sub-Window Frame ────────────────────────────────────
@@ -34,7 +35,7 @@ struct AmpWindowFrame<Content: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Title bar
+            // ── Title bar ─────────────────────────────────────────────────
             HStack(spacing: 4) {
                 Text("⚡")
                     .font(.system(size: 8, weight: .black))
@@ -72,14 +73,21 @@ struct AmpWindowFrame<Content: View>: View {
             )
             .overlay(Rectangle().fill(AmpColor.bevelShadow).frame(height: 1), alignment: .bottom)
 
-            content
+            // ── Content area ──
+            ZStack {
+                AmpColor.panelDeep
+                content
+                    .frame(width: width)
+                    .clipped()
+            }
         }
-        .frame(width: width, height: height)
+        .frame(width: width)
         .background(AmpColor.panelDeep)
         .overlay(
             ZStack {
-                VStack { Rectangle().fill(AmpColor.bevelHigh).frame(height: 1); Spacer(); Rectangle().fill(AmpColor.bevelShadow).frame(height: 1) }
+                VStack { Rectangle().fill(AmpColor.bevelHigh).frame(height: 1); Spacer() }
                 HStack { Rectangle().fill(AmpColor.bevelHigh).frame(width: 1); Spacer(); Rectangle().fill(AmpColor.bevelShadow).frame(width: 1) }
+                VStack { Spacer(); Rectangle().fill(AmpColor.bevelShadow).frame(height: 1) }
             }
         )
         .shadow(color: .black.opacity(0.75), radius: 12, x: 3, y: 5)
@@ -92,40 +100,155 @@ struct WinampEQWindow: View {
     @EnvironmentObject var viewModel: PlayerViewModel
     @Binding var isPresented: Bool
 
-    var body: some View {
-        AmpWindowFrame(title: "EQUALIZER", width: 275, height: 260, onClose: { isPresented = false }) {
-            VStack(spacing: 0) {
-                // Spectrum display
-                BevelBox(style: .inset) {
-                    WinampEQDisplay(
-                        frequencyBands: Binding(
-                            get: { viewModel.eqSpectrumData },
-                            set: { _ in }
-                        ),
-                        width: 275,
-                        height: 72
-                    )
-                    .background(AmpColor.displayBg)
-                }
-                .frame(height: 72)
+    private let eqWidth: CGFloat = 325
 
-                // EQ band sliders
-                HStack(spacing: 1) {
-                    ForEach(0..<10, id: \.self) { i in
-                        WinampEQBand(index: i, viewModel: viewModel)
+    var body: some View {
+        AmpWindowFrame(title: "EQUALIZER", width: eqWidth, height: 0, onClose: { isPresented = false }) {
+            VStack(spacing: 0) {
+
+                // ── Spectrum analyzer display ─────────────────────────────
+                ZStack {
+                    AmpColor.displayBg
+
+                    // Scanlines
+                    GeometryReader { g in
+                        let lines = Int(g.size.height / 2)
+                        VStack(spacing: 0) {
+                            ForEach(0..<lines, id: \.self) { _ in
+                                AmpColor.displayScanAlt.frame(height: 1)
+                                Color.clear.frame(height: 1)
+                            }
+                        }
+                    }
+
+                    // dB grid lines (horizontal)
+                    GeometryReader { g in
+                        let dbLines: [(CGFloat, Color)] = [
+                            (0.0,  AmpColor.textDim.opacity(0.5)),   // +12
+                            (0.25, AmpColor.textDim.opacity(0.3)),   // +6
+                            (0.5,  AmpColor.neonGreenDim.opacity(0.6)), // 0
+                            (0.75, AmpColor.textDim.opacity(0.3)),   // -6
+                            (1.0,  AmpColor.textDim.opacity(0.3)),   // -12
+                        ]
+                        ZStack {
+                            ForEach(Array(dbLines.enumerated()), id: \.offset) { _, pair in
+                                Rectangle()
+                                    .fill(pair.1)
+                                    .frame(height: 1)
+                                    .offset(y: pair.0 * g.size.height - g.size.height / 2)
+                            }
+                        }
+                    }
+
+                    // dB labels (left)
+                    VStack {
+                        HStack {
+                            VStack(alignment: .trailing, spacing: 0) {
+                                ForEach(["+12", " +6", "  0", " -6", "-12"], id: \.self) { lbl in
+                                    Text(lbl)
+                                        .font(.ampMono(5.5, weight: .bold))
+                                        .foregroundColor(AmpColor.textDim)
+                                        .frame(height: 16)
+                                }
+                            }
+                            .padding(.leading, 3)
+                            Spacer()
+                        }
+                    }
+
+                    // Spectrum bars
+                    HStack(spacing: 0) {
+                        Spacer().frame(width: 24) // offset for dB labels
+                        HStack(spacing: 2) {
+                            ForEach(0..<10, id: \.self) { i in
+                                EQSpectrumBar(value: viewModel.eqSpectrumData.indices.contains(i) ? viewModel.eqSpectrumData[i] : 0)
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
                     }
                 }
-                .padding(.horizontal, 4)
+                .frame(height: 80)
+                .overlay(
+                    Rectangle()
+                        .stroke(AmpColor.bevelShadow, lineWidth: 1)
+                )
+
+                // ── Band frequency labels ─────────────────────────────────
+                HStack(spacing: 0) {
+                    Spacer().frame(width: 24)
+                    HStack(spacing: 0) {
+                        ForEach(["60", "170", "310", "600", "1K", "3K", "6K", "12K", "14K", "16K"], id: \.self) { lbl in
+                            Text(lbl)
+                                .font(.ampMono(6, weight: .bold))
+                                .foregroundColor(AmpColor.textMid)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+                .background(AmpColor.panelDark)
+
+                // ── EQ Sliders ────────────────────────────────────────────
+                HStack(spacing: 0) {
+                    // dB scale axis
+                    VStack(alignment: .trailing, spacing: 0) {
+                        ForEach(["+12", "+6", "0", "-6", "-12"], id: \.self) { lbl in
+                            Text(lbl)
+                                .font(.ampMono(5.5, weight: .bold))
+                                .foregroundColor(AmpColor.textDim)
+                                .frame(height: 22, alignment: .center)
+                        }
+                    }
+                    .frame(width: 22)
+                    .padding(.trailing, 2)
+
+                    HStack(spacing: 4) {
+                        ForEach(0..<10, id: \.self) { i in
+                            WinampEQBand(index: i, viewModel: viewModel)
+                        }
+                    }
+                }
+                .padding(.horizontal, 6)
                 .padding(.vertical, 6)
                 .background(AmpColor.panelDark)
-                .overlay(Rectangle().fill(AmpColor.bevelShadow).frame(height: 1), alignment: .bottom)
 
-                // Preset + EQ on/off bar
-                HStack(spacing: 3) {
-                    AmpButton(label: "PRESET", width: 44, height: 14) {}
-                    AmpButton(label: "LOAD",   width: 36, height: 14) {}
-                    AmpButton(label: "SAVE",   width: 36, height: 14) {}
+                // ── Divider ───────────────────────────────────────────────
+                Rectangle().fill(AmpColor.bevelShadow).frame(height: 1)
+
+                // ── Controls bar ──────────────────────────────────────────
+                HStack(spacing: 4) {
+                    // PRESET Menu
+                    Menu {
+                        ForEach(PlayerViewModel.eqPresets) { preset in
+                            Button(preset.name) {
+                                viewModel.applyEQPreset(preset)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 2) {
+                            Text("PRESET")
+                                .font(.ampMono(7, weight: .bold))
+                                .foregroundColor(AmpColor.textBright)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 6))
+                                .foregroundColor(AmpColor.neonGreen)
+                        }
+                        .frame(width: 54, height: 14)
+                        .background(AmpColor.panelLight)
+                        .overlay(
+                            ZStack {
+                                VStack { Rectangle().fill(AmpColor.bevelHigh).frame(height: 1); Spacer(); Rectangle().fill(AmpColor.bevelShadow).frame(height: 1) }
+                                HStack { Rectangle().fill(AmpColor.bevelHigh).frame(width: 1); Spacer(); Rectangle().fill(AmpColor.bevelShadow).frame(width: 1) }
+                            }
+                        )
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+
+                    AmpButton(label: "LOAD",   width: 40, height: 14) { /* mocked for now - but functional UI interaction */ }
+                    AmpButton(label: "SAVE",   width: 40, height: 14) { /* mocked for now */ }
                     Spacer()
+                    // EQ on/off
                     Toggle("", isOn: Binding(
                         get: { viewModel.isEQEnabled() },
                         set: { viewModel.setEQEnabled($0) }
@@ -136,15 +259,43 @@ struct WinampEQWindow: View {
                     Text("EQ")
                         .font(.ampMono(7, weight: .bold))
                         .foregroundColor(viewModel.isEQEnabled() ? AmpColor.neonGreen : AmpColor.textDim)
-                        .shadow(color: viewModel.isEQEnabled() ? AmpColor.neonGreen.opacity(0.8) : .clear, radius: 2)
+                        .shadow(color: viewModel.isEQEnabled() ? AmpColor.neonGreen.opacity(0.8) : .clear, radius: 3)
                 }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
                 .background(AmpColor.panelDeep)
             }
         }
     }
 }
+
+// ─── MARK: Spectrum Bar (read-only, for display) ──────────────────────────────
+
+private struct EQSpectrumBar: View {
+    let value: Float   // 0…1
+
+    var body: some View {
+        GeometryReader { geo in
+            let h = geo.size.height
+            let barH = max(1, CGFloat(value) * h)
+            VStack(spacing: 0) {
+                Spacer()
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.0, green: 1.0, blue: 0.25),   // top bright
+                        Color(red: 0.0, green: 0.75, blue: 0.15),  // mid
+                        Color(red: 0.0, green: 0.45, blue: 0.08),  // bottom dim
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .frame(width: max(2, geo.size.width - 2), height: barH)
+                .shadow(color: AmpColor.neonGreen.opacity(0.4), radius: 2)
+            }
+        }
+        .animation(.linear(duration: 0.04), value: value)
+    }
+}
+
 
 // ─── MARK: EQ Band ───────────────────────────────────────────────────────────
 
@@ -152,79 +303,120 @@ struct WinampEQBand: View {
     let index: Int
     @ObservedObject var viewModel: PlayerViewModel
     @State private var gain: Float = 0.0
-    private let bandLabels = ["60", "170", "310", "600", "1K", "3K", "6K", "12K", "14K", "16K"]
+    
+    // Sync with ViewModel
+    private func updateFromViewModel() {
+        if let g = viewModel.getEQBand(index: index) {
+            gain = g
+        }
+    }
 
     var body: some View {
-        VStack(spacing: 2) {
-            Text(bandLabels[index])
-                .font(.ampMono(6, weight: .bold))
-                .foregroundColor(AmpColor.textMid)
-                .frame(height: 10)
+        VStack(spacing: 3) {
+            // Vertical slider track
+            ZStack {
+                // Inset background
+                AmpColor.displayBg
+                    .overlay(
+                        ZStack {
+                            VStack { Rectangle().fill(AmpColor.bevelShadow).frame(height: 1); Spacer() }
+                            HStack { Rectangle().fill(AmpColor.bevelShadow).frame(width: 1); Spacer() }
+                            VStack { Spacer(); Rectangle().fill(AmpColor.bevelHigh).frame(height: 1) }
+                            HStack { Spacer(); Rectangle().fill(AmpColor.bevelHigh).frame(width: 1) }
+                        }
+                    )
 
-            BevelBox(style: .inset) {
                 GeometryReader { geo in
                     let h = geo.size.height
                     let normalized = CGFloat((gain + 12.0) / 24.0)
-                    let thumbY = (1.0 - normalized) * h
+                    let thumbY = (1.0 - normalized) * (h - 10) // keep thumb inside bounds
 
                     ZStack(alignment: .top) {
-                        AmpColor.displayBg
-
-                        // Zero dB line
+                        // Zero dB center line
                         Rectangle()
-                            .fill(AmpColor.textDim)
-                            .frame(width: 18, height: 1)
+                            .fill(AmpColor.neonGreenFade)
+                            .frame(width: 22, height: 1)
                             .offset(y: h / 2)
 
-                        // Gain fill
+                        // Gain fill bar
                         if gain > 0.1 {
-                            AmpColor.neonGreenDim
-                                .frame(width: 6, height: CGFloat(gain / 12.0) * h / 2)
-                                .offset(x: 6, y: h / 2 - CGFloat(gain / 12.0) * h / 2)
+                            let fillH = CGFloat(gain / 12.0) * h / 2
+                            LinearGradient(
+                                colors: [AmpColor.neonGreen.opacity(0.9), AmpColor.neonGreenDim],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                            .frame(width: 4, height: fillH)
+                            .offset(x: 0, y: h / 2 - fillH)
+                            .shadow(color: AmpColor.neonGreen.opacity(0.6), radius: 2)
                         } else if gain < -0.1 {
-                            Color(red: 0.8, green: 0.2, blue: 0)
-                                .opacity(0.6)
-                                .frame(width: 6, height: CGFloat(abs(gain) / 12.0) * h / 2)
-                                .offset(x: 6, y: h / 2)
+                            let fillH = CGFloat(abs(gain) / 12.0) * h / 2
+                            LinearGradient(
+                                colors: [Color(red: 0.9, green: 0.3, blue: 0.0), Color(red: 0.5, green: 0.1, blue: 0.0)],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                            .opacity(0.8)
+                            .frame(width: 4, height: fillH)
+                            .offset(x: 0, y: h / 2)
                         }
 
                         // Thumb
                         ZStack {
-                            Rectangle().fill(AmpColor.panelLight).frame(width: 18, height: 8)
-                            Rectangle().fill(AmpColor.neonGreenDim).frame(width: 10, height: 2)
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(AmpColor.panelLight)
+                                .frame(width: 22, height: 10)
+                            // Grip lines
+                            VStack(spacing: 2) {
+                                ForEach(0..<3, id: \.self) { _ in
+                                    Rectangle()
+                                        .fill(AmpColor.neonGreenDim)
+                                        .frame(width: 14, height: 1)
+                                }
+                            }
                         }
                         .overlay(
                             ZStack {
                                 VStack { Rectangle().fill(AmpColor.bevelHigh).frame(height: 1); Spacer() }
                                 HStack { Rectangle().fill(AmpColor.bevelHigh).frame(width: 1); Spacer() }
+                                VStack { Spacer(); Rectangle().fill(AmpColor.bevelShadow).frame(height: 1) }
+                                HStack { Spacer(); Rectangle().fill(AmpColor.bevelShadow).frame(width: 1) }
                             }
                         )
-                        .offset(y: thumbY - 4)
+                        .offset(y: thumbY)
+                        .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
                     }
                     .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { val in
-                                let clamped = max(0, min(1, Float(val.location.y / h)))
+                                let rawPos = val.location.y / h
+                                let clamped = max(0, min(1, Float(rawPos)))
                                 gain = (1.0 - clamped) * 24.0 - 12.0
                                 viewModel.setEQBand(index: index, gain: gain)
                             }
                     )
                 }
-                .frame(width: 20, height: 110)
+                .frame(width: 24, height: 110)
             }
+            .frame(width: 24, height: 110)
 
-            Text(String(format: "%+.0f", gain))
+            // Gain value label
+            Text(gain == 0 ? "  0" : String(format: "%+.0f", gain))
                 .font(.ampMono(6, weight: .bold))
-                .foregroundColor(gain > 0 ? AmpColor.neonGreen : (gain < 0 ? AmpColor.amber : AmpColor.textDim))
+                .foregroundColor(
+                    gain > 0.5  ? AmpColor.neonGreen :
+                    gain < -0.5 ? AmpColor.amber :
+                    AmpColor.textDim
+                )
+                .shadow(color: gain > 0.5 ? AmpColor.neonGreen.opacity(0.6) : .clear, radius: 2)
                 .frame(height: 10)
         }
-        .frame(width: 24)
-        .onAppear {
-            if let g = viewModel.getEQBand(index: index) { gain = g }
-        }
+        .frame(maxWidth: .infinity)
+        .onAppear { updateFromViewModel() }
+        .onChange(of: viewModel.eqSpectrumData) { _ in updateFromViewModel() }
+        .onReceive(viewModel.objectWillChange) { _ in updateFromViewModel() }
     }
 }
+
 
 // ─── MARK: Playlist Window ────────────────────────────────────────────────────
 
@@ -364,7 +556,7 @@ struct WinampAlbumArtWindow: View {
     @Binding var isPresented: Bool
 
     var body: some View {
-        AmpWindowFrame(title: "ALBUM ART", width: 210, height: 236, onClose: { isPresented = false }) {
+        AmpWindowFrame(title: "ALBUM ART", width: 210, height: 0, onClose: { isPresented = false }) {
             BevelBox(style: .inset) {
                 Group {
                     if let art = viewModel.metadata.albumArt {

@@ -30,21 +30,6 @@ struct WinampPlayerView: View {
         }
         .frame(width: 275, height: 116)
         .background(AmpColor.panelDeep)
-        // Outer bevel border
-        .overlay(
-            ZStack {
-                VStack(spacing: 0) {
-                    Rectangle().fill(AmpColor.bevelHigh).frame(height: 1)
-                    Spacer()
-                    Rectangle().fill(AmpColor.bevelShadow).frame(height: 1)
-                }
-                HStack(spacing: 0) {
-                    Rectangle().fill(AmpColor.bevelHigh).frame(width: 1)
-                    Spacer()
-                    Rectangle().fill(AmpColor.bevelShadow).frame(width: 1)
-                }
-            }
-        )
         .shadow(color: .black.opacity(0.7), radius: 10, x: 2, y: 4)
         .onDrop(of: [.fileURL], isTargeted: nil, perform: handleDrop)
         .fileImporter(
@@ -361,9 +346,9 @@ struct WinampPlayerView: View {
     private var bottomBar: some View {
         HStack(spacing: 2) {
             AmpButton(label: "LOAD", width: 32, height: 14) { showingFilePicker = true }
-            AmpButton(label: "EQ",   width: 24, height: 14, isActive: showingEQ)    { showingEQ.toggle() }
-            AmpButton(label: "LIST", width: 28, height: 14, isActive: showingPlaylist) { showingPlaylist.toggle() }
-            AmpButton(label: "ART",  width: 28, height: 14, isActive: showingAlbumArt) { showingAlbumArt.toggle() }
+            AmpButton(label: "EQ",   isActive: showingEQ,     width: 24, height: 14) { showingEQ.toggle() }
+            AmpButton(label: "LIST", isActive: showingPlaylist, width: 28, height: 14) { showingPlaylist.toggle() }
+            AmpButton(label: "ART",  isActive: showingAlbumArt, width: 28, height: 14) { showingAlbumArt.toggle() }
             AmpButton(label: "SET",  width: 28, height: 14) { showingSettings.toggle() }
             AmpButton(label: "LYR",  width: 28, height: 14) { showingLyrics.toggle() }
             AmpButton(label: "SRCH", width: 32, height: 14) { showingSearch.toggle() }

@@ -2,45 +2,84 @@
 //  AmpereDesignSystem.swift
 //  Ampere
 //
-//  Unified bitmap-style Winamp design tokens and reusable components
+//  Unified bitmap-style Winamp design tokens and reusable components.
+//  Colors now sourced from ThemeManager via AmpSkin environment key.
 //
 
 import SwiftUI
 import AppKit
 
-// ─── MARK: Color Palette ─────────────────────────────────────────────────────
+// ─── MARK: Environment Key for Active Skin ───────────────────────────────────
+
+struct AmpSkinKey: EnvironmentKey {
+    static let defaultValue: SkinColors = BuiltInTheme.classic.colors
+}
+
+extension EnvironmentValues {
+    var ampSkin: SkinColors {
+        get { self[AmpSkinKey.self] }
+        set { self[AmpSkinKey.self] = newValue }
+    }
+}
+
+// ─── MARK: Static Color Palette (default = Classic skin) ─────────────────────
+// Used by views that haven't yet been updated to @Environment(\.ampSkin).
+// These are overridden at runtime via the environment.
 
 enum AmpColor {
     // Base panels
-    static let panelDeep      = Color(red: 0.05, green: 0.06, blue: 0.04)   // #0d0f0b near black
-    static let panelDark      = Color(red: 0.10, green: 0.12, blue: 0.08)   // #1a1f14 dark olive
-    static let panelMid       = Color(red: 0.14, green: 0.16, blue: 0.11)   // panel mid
-    static let panelLight     = Color(red: 0.20, green: 0.22, blue: 0.16)   // #333827 raised panel
+    static var panelDeep:      Color { _skin.panelDeep }
+    static var panelDark:      Color { _skin.panelDark }
+    static var panelMid:       Color { _skin.panelMid }
+    static var panelLight:     Color { _skin.panelLight }
 
     // Bevel highlights / shadows
-    static let bevelHigh      = Color(red: 0.38, green: 0.40, blue: 0.32)   // top-left bevel
-    static let bevelShadow    = Color(red: 0.02, green: 0.02, blue: 0.02)   // bottom-right bevel
+    static var bevelHigh:      Color { _skin.bevelHigh }
+    static var bevelShadow:    Color { _skin.bevelShadow }
 
-    // Accent — electric green
-    static let neonGreen      = Color(red: 0.0,  green: 1.00, blue: 0.255)  // #00FF41
-    static let neonGreenDim   = Color(red: 0.0,  green: 0.55, blue: 0.14)   // dim green
-    static let neonGreenFade  = Color(red: 0.0,  green: 0.25, blue: 0.07)   // very dim
+    // Accent
+    static var neonGreen:      Color { _skin.neonGreen }
+    static var neonGreenDim:   Color { _skin.neonGreenDim }
+    static var neonGreenFade:  Color { _skin.neonGreenFade }
 
-    // Accent — orange / amber
-    static let amber          = Color(red: 1.00, green: 0.40, blue: 0.00)   // #ff6600
-    static let amberDim       = Color(red: 0.60, green: 0.24, blue: 0.00)
+    // Amber
+    static var amber:          Color { _skin.amber }
+    static var amberDim:       Color { _skin.amberDim }
 
     // Text
-    static let textBright     = Color(red: 0.85, green: 0.95, blue: 0.72)
-    static let textMid        = Color(red: 0.50, green: 0.58, blue: 0.40)
-    static let textDim        = Color(red: 0.28, green: 0.32, blue: 0.22)
+    static var textBright:     Color { _skin.textBright }
+    static var textMid:        Color { _skin.textMid }
+    static var textDim:        Color { _skin.textDim }
 
     // Display (LCD / CRT)
-    static let displayBg      = Color(red: 0.02, green: 0.05, blue: 0.01)
-    static let displayScanAlt = Color(red: 0.06, green: 0.08, blue: 0.04)
+    static var displayBg:      Color { _skin.displayBg }
+    static var displayScanAlt: Color { _skin.displayScanAlt }
 
     // Seekbar / track
-    static let trackBg        = Color(red: 0.07, green: 0.09, blue: 0.05)
+    static var trackBg:        Color { _skin.trackBg }
+
+    /// Updated any time ThemeManager publishes a change.
+    static var _skin: SkinColors = BuiltInTheme.classic.colors
+}
+
+// ─── MARK: View Modifier: apply skin to subtree ───────────────────────────────
+
+struct SkinApplier: ViewModifier {
+    @ObservedObject var themeManager: ThemeManager
+    func body(content: Content) -> some View {
+        content
+            .environment(\.ampSkin, themeManager.colors)
+            .onReceive(themeManager.$activeTheme) { _ in
+                AmpColor._skin = themeManager.colors
+            }
+    }
+}
+
+extension View {
+    func applySkin(_ themeManager: ThemeManager) -> some View {
+        modifier(SkinApplier(themeManager: themeManager))
+            .onAppear { AmpColor._skin = themeManager.colors }
+    }
 }
 
 // ─── MARK: Typography ────────────────────────────────────────────────────────
@@ -101,7 +140,6 @@ struct LcdBackground: View {
     var body: some View {
         ZStack {
             AmpColor.displayBg
-            // Subtle scanline effect
             GeometryReader { geo in
                 let lines = Int(geo.size.height / 2)
                 VStack(spacing: 0) {
@@ -146,10 +184,7 @@ struct AmpButton: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                // Base fill – inset when pressed
                 (isPressed ? AmpColor.panelDark : AmpColor.panelLight)
-
-                // Bevel overlay
                 ZStack {
                     VStack(spacing: 0) {
                         Rectangle().fill(isPressed ? AmpColor.bevelShadow : AmpColor.bevelHigh).frame(height: 1)
@@ -162,8 +197,6 @@ struct AmpButton: View {
                         Rectangle().fill(isPressed ? AmpColor.bevelHigh : AmpColor.bevelShadow).frame(width: 1)
                     }
                 }
-
-                // Content
                 Group {
                     if let icon = icon {
                         Image(systemName: icon)
@@ -198,7 +231,6 @@ struct LedDigitDisplay: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            // Dim background ghost characters for LCD feel
             Text(text.map { _ in "8" }.joined())
                 .font(.ampDigital(size))
                 .foregroundColor(AmpColor.neonGreenFade)
@@ -225,7 +257,6 @@ struct MiniSpectrumView: View {
                 let h = max(2, CGFloat(bands[i]) * maxHeight)
                 VStack(spacing: 0) {
                     Spacer()
-                    // Color gradient: green → yellow → red at top
                     spectrumBar(height: h, maxH: maxHeight)
                         .frame(width: barWidth, height: h)
                         .animation(.linear(duration: 0.04), value: bands[i])
@@ -238,14 +269,12 @@ struct MiniSpectrumView: View {
     private func spectrumBar(height: CGFloat, maxH: CGFloat) -> some View {
         let pct = height / maxH
         let color: Color
-        if pct > 0.80 { color = Color(red: 1.0, green: 0.15, blue: 0.0) }
+        if pct > 0.80      { color = Color(red: 1.0, green: 0.15, blue: 0.0) }
         else if pct > 0.55 { color = Color(red: 1.0, green: 0.65, blue: 0.0) }
-        else { color = AmpColor.neonGreen }
-
+        else               { color = AmpColor.neonGreen }
         return LinearGradient(
             gradient: Gradient(colors: [color.opacity(0.4), color]),
-            startPoint: .top,
-            endPoint: .bottom
+            startPoint: .top, endPoint: .bottom
         )
     }
 }
@@ -261,7 +290,7 @@ struct MarqueeText: View {
     @State private var textWidth: CGFloat = 0
 
     var body: some View {
-        GeometryReader { geo in
+        GeometryReader { _ in
             Text(text + "   " + text)
                 .font(font)
                 .foregroundColor(color)
