@@ -62,18 +62,40 @@ public sealed partial class MainWindow : Window
 
     private void UpdateStateUI(PlayerState state)
     {
-        StateText.Text = state.ToString();
-        
+        // LED indicator: neon green = playing, amber = paused, dim = stopped
         var color = state switch
         {
-            PlayerState.Playing => new SolidColorBrush(Microsoft.UI.Colors.Green),
-            PlayerState.Paused => new SolidColorBrush(Microsoft.UI.Colors.Orange),
-            _ => new SolidColorBrush(Microsoft.UI.Colors.Gray)
+            PlayerState.Playing => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 255, 65)),    // #00FF41
+            PlayerState.Paused  => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 102, 0)),  // #FF6600
+            _                   => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 80, 22))     // dim
         };
-        
         StateIndicator.Fill = color;
-        
-        PlayPauseButton.Content = state == PlayerState.Playing ? "Pause" : "Play";
+
+        // Button symbol
+        PlayPauseButton.Content = state == PlayerState.Playing ? "⏸" : "▶";
+
+        // Update seek position
+        if (player != null)
+        {
+            try
+            {
+                var pos      = player.GetPosition();
+                var duration = player.GetDuration();
+                if (duration > 0)
+                {
+                    PositionSlider.Value = pos / duration;
+                    CurrentTimeText.Text = FormatTime(pos);
+                    DurationText.Text    = FormatTime(duration);
+                }
+            }
+            catch { }
+        }
+    }
+
+    private static string FormatTime(double seconds)
+    {
+        var s = (int)seconds;
+        return $"{s / 60}:{(s % 60):D2}";
     }
 
     private async void OpenFileButton_Click(object sender, RoutedEventArgs e)
@@ -140,6 +162,33 @@ public sealed partial class MainWindow : Window
         catch (System.Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Stop error: {ex.Message}");
+        }
+    }
+
+    private void PrevButton_Click(object sender, RoutedEventArgs e)
+    {
+        // TODO: integrate with playlist previous track
+        System.Diagnostics.Debug.WriteLine("Prev track");
+    }
+
+    private void NextButton_Click(object sender, RoutedEventArgs e)
+    {
+        // TODO: integrate with playlist next track
+        System.Diagnostics.Debug.WriteLine("Next track");
+    }
+
+    private void PositionSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        if (player == null) return;
+        try
+        {
+            var duration = player.GetDuration();
+            if (duration > 0)
+                player.Seek(e.NewValue * duration);
+        }
+        catch (System.Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Seek error: {ex.Message}");
         }
     }
 
