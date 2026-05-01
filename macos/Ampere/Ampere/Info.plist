@@ -36,7 +36,7 @@
             <key>CFBundleTypeRole</key>
             <string>Editor</string>
             <key>LSHandlerRank</key>
-            <string>Default</string>
+            <string>Owner</string>
             <key>LSItemContentTypes</key>
             <array>
                 <string>public.mp3</string>
@@ -45,9 +45,23 @@
                 <string>public.audio</string>
                 <string>org.xiph.flac</string>
             </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>mp3</string>
+                <string>m4a</string>
+                <string>wav</string>
+                <string>flac</string>
+            </array>
+            <key>CFBundleTypeOSTypes</key>
+            <array>
+                <string>MP3 </string>
+                <string>WAVE</string>
+            </array>
         </dict>
     </array>
-    <key>UTExportedTypeDeclarations</key>
+    <key>LSSupportsOpeningDocumentsInPlace</key>
+    <true/>
+    <key>UTImportedTypeDeclarations</key>
     <array>
         <dict>
             <key>UTTypeConformsTo</key>
@@ -55,15 +69,15 @@
                 <string>public.audio</string>
             </array>
             <key>UTTypeIdentifier</key>
-            <string>public.mp3</string>
+            <string>org.xiph.flac</string>
             <key>UTTypeTagSpecification</key>
             <dict>
                 <key>public.filename-extension</key>
                 <array>
-                    <string>mp3</string>
+                    <string>flac</string>
                 </array>
                 <key>public.mime-type</key>
-                <string>audio/mpeg</string>
+                <string>audio/flac</string>
             </dict>
         </dict>
     </array>
