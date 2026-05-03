@@ -27,6 +27,8 @@ class AudioPlayer: NSObject, ObservableObject {
     private var timeObserver: Any?
     private var timer: Timer?
     private var statusObserver: NSKeyValueObservation?
+    /// Finishes starting playback when `AVPlayerItem` becomes `.readyToPlay` after `loadFile`.
+    private var pendingPlayObserver: NSKeyValueObservation?
     private let positionUpdateInterval: TimeInterval = 0.05
     
     // Store security-scoped URL for file access
@@ -53,6 +55,7 @@ class AudioPlayer: NSObject, ObservableObject {
             player?.removeTimeObserver(observer)
         }
         statusObserver?.invalidate()
+        pendingPlayObserver?.invalidate()
         playerItem?.removeObserver(self, forKeyPath: #keyPath(AVPlayerItem.duration))
         playerItem?.removeObserver(self, forKeyPath: #keyPath(AVPlayerItem.status))
         NotificationCenter.default.removeObserver(self)
@@ -99,6 +102,8 @@ class AudioPlayer: NSObject, ObservableObject {
         
         // Clean up previous item
         statusObserver?.invalidate()
+        pendingPlayObserver?.invalidate()
+        pendingPlayObserver = nil
         if let oldItem = playerItem {
             oldItem.removeObserver(self, forKeyPath: #keyPath(AVPlayerItem.duration))
             oldItem.removeObserver(self, forKeyPath: #keyPath(AVPlayerItem.status))
@@ -134,6 +139,8 @@ class AudioPlayer: NSObject, ObservableObject {
         // Observe duration
         playerItem?.addObserver(self, forKeyPath: #keyPath(AVPlayerItem.duration), options: [.new, .initial], context: nil)
         
+        syncDurationFromItem()
+        
         // Observe status
         playerItem?.addObserver(self, forKeyPath: #keyPath(AVPlayerItem.status), options: [.new], context: nil)
         
@@ -164,16 +171,7 @@ class AudioPlayer: NSObject, ObservableObject {
             if let status = playerItem?.status {
                 print("PlayerItem status changed to: \(status.rawValue)")
                 if status == .readyToPlay {
-                    // File is ready, ensure duration is set
-                    if let duration = playerItem?.duration {
-                        let durationSeconds = CMTimeGetSeconds(duration)
-                        if !durationSeconds.isNaN && durationSeconds.isFinite && durationSeconds > 0 {
-                            DispatchQueue.main.async { [weak self] in
-                                self?.duration = durationSeconds
-                                print("Duration set to: \(durationSeconds) seconds (from status)")
-                            }
-                        }
-                    }
+                    syncDurationFromItem()
                 } else if status == .failed {
                     if let error = playerItem?.error {
                         print("PlayerItem failed with error: \(error)")
@@ -194,63 +192,58 @@ class AudioPlayer: NSObject, ObservableObject {
     }
     
     func play() throws {
-        guard let player = player, let playerItem = playerItem else {
+        guard let player = player, let item = playerItem else {
             print("ERROR: Cannot play - no player or playerItem")
             throw NSError(domain: "AudioPlayer", code: 2, userInfo: [NSLocalizedDescriptionKey: "No file loaded"])
         }
-        
-        print("Play called - current status: \(playerItem.status.rawValue)")
-        print("Player volume before play: \(player.volume)")
-        
-        // ALWAYS set volume before playing
         player.volume = volume
-        print("Player volume set to: \(volume)")
+        pendingPlayObserver?.invalidate()
+        pendingPlayObserver = nil
         
-        // Set state to playing immediately for UI responsiveness
-        DispatchQueue.main.async { [weak self] in
-            self?.state = .playing
-        }
-        
-        // Try to play - AVPlayer will handle buffering
-        player.play()
-        print("player.play() called")
-        
-        // Verify playback started - check multiple times
-        var checkCount = 0
-        let maxChecks = 10
-        
-        func verifyPlayback() {
-            checkCount += 1
-            guard let player = self.player, let playerItem = self.playerItem else { return }
-            
-            if player.rate > 0 {
-                print("✅ Player is playing! Rate: \(player.rate)")
-                DispatchQueue.main.async { [weak self] in
-                    self?.state = .playing
-                }
-            } else if checkCount < maxChecks {
-                print("⚠️ Check \(checkCount): Player.rate is 0, retrying...")
-                // Try playing again
-                player.play()
-                // Check again after a short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    verifyPlayback()
-                }
-            } else {
-                print("❌ ERROR: Player failed to start after \(maxChecks) attempts")
-                print("   Status: \(playerItem.status.rawValue)")
-                if let error = playerItem.error {
-                    print("   Error: \(error.localizedDescription)")
-                } else {
-                    print("   Error: none")
-                }
-                // Still set state to playing - user can see it's trying
+        let kickPlayback = { [weak self] in
+            guard let self = self, let p = self.player else { return }
+            p.volume = self.volume
+            p.play()
+            DispatchQueue.main.async {
+                self.state = .playing
+                self.syncDurationFromItem()
             }
         }
         
-        // Start verification after initial play
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            verifyPlayback()
+        switch item.status {
+        case .readyToPlay:
+            kickPlayback()
+        case .failed:
+            let err = item.error?.localizedDescription ?? "Playback failed"
+            print("PlayerItem failed: \(err)")
+            throw item.error ?? NSError(domain: "AudioPlayer", code: 4, userInfo: [NSLocalizedDescriptionKey: err])
+        default:
+            pendingPlayObserver = item.observe(\.status, options: [.new]) { [weak self] observed, _ in
+                guard let self = self else { return }
+                switch observed.status {
+                case .readyToPlay:
+                    self.pendingPlayObserver?.invalidate()
+                    self.pendingPlayObserver = nil
+                    kickPlayback()
+                case .failed:
+                    self.pendingPlayObserver?.invalidate()
+                    self.pendingPlayObserver = nil
+                    DispatchQueue.main.async { self.state = .stopped }
+                    print("PlayerItem failed while preparing")
+                default:
+                    break
+                }
+            }
+            player.play()
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            guard let self = self, let p = self.player, let it = self.playerItem else { return }
+            if p.rate == 0, it.status == .readyToPlay {
+                p.volume = self.volume
+                p.play()
+            }
+            self.syncDurationFromItem()
         }
     }
     
@@ -284,12 +277,48 @@ class AudioPlayer: NSObject, ObservableObject {
         print("Volume set to: \(clampedVolume), player.volume: \(player?.volume ?? -1)")
     }
     
-    func seek(to position: Double) {
-        guard let player = player, let duration = duration, duration > 0 else {
+    /// Resolves duration from the item (KVO often leaves `duration` nil until the asset finishes loading).
+    private func syncDurationFromItem() {
+        guard let item = playerItem else { return }
+        let seconds = CMTimeGetSeconds(item.duration)
+        if !seconds.isNaN && seconds.isFinite && seconds > 0 {
+            DispatchQueue.main.async { [weak self] in
+                self?.duration = seconds
+            }
             return
         }
+        let asset = item.asset
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let cm = try await asset.load(.duration)
+                let s = CMTimeGetSeconds(cm)
+                guard !s.isNaN && s.isFinite && s > 0 else { return }
+                await MainActor.run {
+                    guard self.playerItem?.asset === asset else { return }
+                    self.duration = s
+                }
+            } catch {
+                print("async duration load failed: \(error)")
+            }
+        }
+    }
+    
+    func seek(to position: Double) {
+        guard let player = player, let item = playerItem else { return }
+        var dur = duration ?? 0
+        if dur <= 0 {
+            let s = CMTimeGetSeconds(item.duration)
+            if !s.isNaN && s.isFinite && s > 0 {
+                dur = s
+                DispatchQueue.main.async { [weak self] in self?.duration = s }
+            } else {
+                syncDurationFromItem()
+                return
+            }
+        }
         
-        let clampedPosition = max(0.0, min(position, duration))
+        let clampedPosition = max(0.0, min(position, dur))
         let time = CMTime(seconds: clampedPosition, preferredTimescale: 600)
         
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] completed in
@@ -302,10 +331,12 @@ class AudioPlayer: NSObject, ObservableObject {
     }
     
     private func startPositionTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: positionUpdateInterval, repeats: true) { [weak self] _ in
+        stopPositionTimer()
+        let t = Timer(timeInterval: positionUpdateInterval, repeats: true) { [weak self] _ in
             self?.updatePosition()
         }
-        RunLoop.current.add(timer!, forMode: .common)
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
     }
     
     private func stopPositionTimer() {

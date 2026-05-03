@@ -12,6 +12,15 @@ import AppKit
 private let kWindowOriginX = "windowOriginX"
 private let kWindowOriginY = "windowOriginY"
 
+/// Prefer size applied before SwiftUI finishes laying out content (must match ContentView @AppStorage keys).
+private func chromeWidthFromSavedPanelFlags() -> CGFloat {
+    let d = UserDefaults.standard
+    let base = AmpChrome.windowWidth
+    if d.bool(forKey: "showingEQ") { return base + AmpChrome.eqPanelWidth }
+    if d.bool(forKey: "showingAlbumArt") { return base + AmpChrome.albumArtPanelWidth }
+    return base
+}
+
 @main
 struct AmpereApp: App {
     @StateObject private var playerViewModel = PlayerViewModel()
@@ -22,8 +31,12 @@ struct AmpereApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(playerViewModel)
+                .environmentObject(playerViewModel.live)
                 .environmentObject(themeManager)
-                .onAppear { setupWindow() }
+                .onAppear {
+                    setupWindow()
+                    ApplicationsFolderInstallPrompt.checkOnLaunch()
+                }
                 .onOpenURL { url in
                     // Automatically load and play files opened from Finder
                     playerViewModel.loadFile(url: url)
@@ -32,7 +45,7 @@ struct AmpereApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
-        .defaultSize(width: 275, height: 140)
+        .defaultSize(width: AmpChrome.windowWidth, height: 140)
         .commands {
             CommandGroup(replacing: .newItem) { }
             CommandGroup(after: .appInfo) {
@@ -49,7 +62,8 @@ struct AmpereApp: App {
 
             // Style
             window.title = "Ampere"
-            window.isMovableByWindowBackground = true
+            // If true, AppKit steals horizontal drags before SwiftUI — seek scrubbing breaks. Use WindowDragGesture on chrome instead.
+            window.isMovableByWindowBackground = false
             window.level = .floating
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
@@ -73,6 +87,11 @@ struct AmpereApp: App {
                 defaults.set(window.frame.origin.x, forKey: kWindowOriginX)
                 defaults.set(window.frame.origin.y, forKey: kWindowOriginY)
             }
+
+            let snap = { applyMainWindowContentWidth(window, requiredWidth: chromeWidthFromSavedPanelFlags()) }
+            snap()
+            DispatchQueue.main.async(execute: snap)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: snap)
         }
     }
 }

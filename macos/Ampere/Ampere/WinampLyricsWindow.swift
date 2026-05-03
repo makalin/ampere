@@ -10,6 +10,7 @@ import SwiftUI
 struct WinampLyricsWindow: View {
     @EnvironmentObject var viewModel: PlayerViewModel
     @Binding var isPresented: Bool
+    var spanWidth: CGFloat = AmpChrome.windowWidth
     @State private var dragOffset = CGSize.zero
     
     var body: some View {
@@ -64,7 +65,7 @@ struct WinampLyricsWindow: View {
             }
             .background(Color(red: 0.15, green: 0.15, blue: 0.2))
         }
-        .frame(width: 275, height: 200)
+        .frame(width: spanWidth, height: 200)
         .background(winampGradient)
         .cornerRadius(4)
         .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 4)

@@ -62,6 +62,16 @@ enum AmpColor {
     static var _skin: SkinColors = BuiltInTheme.classic.colors
 }
 
+/// Single width for main player + stacked panels so the window doesn’t look narrower on top.
+enum AmpChrome {
+    static let windowWidth: CGFloat = 304
+    /// Side-by-side panels (ContentView `else if` chain — only one at a time).
+    static let eqPanelWidth: CGFloat = 325
+    static let albumArtPanelWidth: CGFloat = 210
+    static let settingsPanelWidth: CGFloat = 320
+    static let searchPanelWidth: CGFloat = 500
+}
+
 // ─── MARK: View Modifier: apply skin to subtree ───────────────────────────────
 
 struct SkinApplier: ViewModifier {
@@ -198,7 +208,26 @@ struct AmpButton: View {
                     }
                 }
                 Group {
-                    if let icon = icon {
+                    let innerW = max(0, width - 4)
+                    if let icon = icon, !label.isEmpty {
+                        HStack(spacing: 1) {
+                            Image(systemName: icon)
+                                .font(.system(size: max(7, height * 0.38), weight: .bold))
+                                .foregroundColor(isActive ? AmpColor.neonGreen : AmpColor.textBright)
+                                .shadow(color: isActive ? AmpColor.neonGreen.opacity(0.8) : .clear, radius: 3)
+                                .frame(width: max(0, innerW * 0.28), alignment: .center)
+                                .lineLimit(1)
+                            Text(label)
+                                .font(.ampMono(6.5, weight: .bold))
+                                .foregroundColor(isActive ? AmpColor.neonGreen : AmpColor.textBright)
+                                .shadow(color: isActive ? AmpColor.neonGreen.opacity(0.8) : .clear, radius: 2)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        }
+                        .frame(width: innerW, height: height, alignment: .center)
+                    } else if let icon = icon {
                         Image(systemName: icon)
                             .font(.ampMono(height * 0.45, weight: .bold))
                             .foregroundColor(isActive ? AmpColor.neonGreen : AmpColor.textBright)
@@ -208,6 +237,10 @@ struct AmpButton: View {
                             .font(.ampMono(7, weight: .bold))
                             .foregroundColor(isActive ? AmpColor.neonGreen : AmpColor.textBright)
                             .shadow(color: isActive ? AmpColor.neonGreen.opacity(0.8) : .clear, radius: 2)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .truncationMode(.tail)
+                            .frame(width: innerW, height: height, alignment: .center)
                     }
                 }
             }
@@ -245,36 +278,52 @@ struct LedDigitDisplay: View {
 }
 
 // ─── MARK: Mini Spectrum Bars ─────────────────────────────────────────────────
+// `bands` entries are normalized 0…1. When `isActive` is false (stopped / paused), bars are forced to 0.
 
 struct MiniSpectrumView: View {
     let bands: [Float]
-    let barWidth: CGFloat
-    let maxHeight: CGFloat
+    let isActive: Bool
 
     var body: some View {
-        HStack(spacing: 1) {
-            ForEach(0..<min(bands.count, 20), id: \.self) { i in
-                let h = max(2, CGFloat(bands[i]) * maxHeight)
-                VStack(spacing: 0) {
-                    Spacer()
-                    spectrumBar(height: h, maxH: maxHeight)
-                        .frame(width: barWidth, height: h)
-                        .animation(.linear(duration: 0.04), value: bands[i])
+        GeometryReader { geo in
+            let count = max(1, bands.count)
+            let spacing: CGFloat = 2
+            let innerW = max(0, geo.size.width - spacing * CGFloat(count - 1))
+            let barW = max(2, innerW / CGFloat(count))
+            let maxH = geo.size.height
+
+            HStack(alignment: .bottom, spacing: spacing) {
+                ForEach(0..<count, id: \.self) { i in
+                    let raw = i < bands.count ? bands[i] : 0
+                    let level = isActive ? CGFloat(max(0, min(1, raw))) : 0
+                    let h = min(maxH, level * maxH)
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        if h >= 1 {
+                            spectrumGradient(height: h, maxH: maxH)
+                                .frame(width: barW, height: h)
+                                .clipped()
+                        }
+                    }
+                    .frame(width: barW, height: maxH, alignment: .bottom)
+                    .clipped()
                 }
-                .frame(width: barWidth, height: maxHeight)
             }
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
         }
+        .clipped()
     }
 
-    private func spectrumBar(height: CGFloat, maxH: CGFloat) -> some View {
-        let pct = height / maxH
+    private func spectrumGradient(height: CGFloat, maxH: CGFloat) -> some View {
+        let pct = maxH > 0 ? height / maxH : 0
         let color: Color
-        if pct > 0.80      { color = Color(red: 1.0, green: 0.15, blue: 0.0) }
+        if pct > 0.80 { color = Color(red: 1.0, green: 0.15, blue: 0.0) }
         else if pct > 0.55 { color = Color(red: 1.0, green: 0.65, blue: 0.0) }
-        else               { color = AmpColor.neonGreen }
+        else { color = AmpColor.neonGreen }
         return LinearGradient(
-            gradient: Gradient(colors: [color.opacity(0.4), color]),
-            startPoint: .top, endPoint: .bottom
+            gradient: Gradient(colors: [color.opacity(0.45), color]),
+            startPoint: .top,
+            endPoint: .bottom
         )
     }
 }

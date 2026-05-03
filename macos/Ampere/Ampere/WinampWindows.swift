@@ -73,13 +73,11 @@ struct AmpWindowFrame<Content: View>: View {
             )
             .overlay(Rectangle().fill(AmpColor.bevelShadow).frame(height: 1), alignment: .bottom)
 
-            // ── Content area ──
-            ZStack {
-                AmpColor.panelDeep
-                content
-                    .frame(width: width)
-                    .clipped()
-            }
+            // ── Content area (no bare Color in ZStack — it expands to fill tall window proposals and leaves black below controls)
+            content
+                .frame(width: width, alignment: .top)
+                .background(AmpColor.panelDeep)
+                .clipped()
         }
         .frame(width: width)
         .background(AmpColor.panelDeep)
@@ -90,7 +88,8 @@ struct AmpWindowFrame<Content: View>: View {
                 VStack { Spacer(); Rectangle().fill(AmpColor.bevelShadow).frame(height: 1) }
             }
         )
-        .shadow(color: .black.opacity(0.75), radius: 12, x: 3, y: 5)
+        // Tight shadow so it doesn’t read as empty space between stacked panels.
+        .shadow(color: .black.opacity(0.6), radius: 5, x: 0, y: 2)
     }
 }
 
@@ -98,12 +97,11 @@ struct AmpWindowFrame<Content: View>: View {
 
 struct WinampEQWindow: View {
     @EnvironmentObject var viewModel: PlayerViewModel
+    @EnvironmentObject var live: PlayerLiveState
     @Binding var isPresented: Bool
 
-    private let eqWidth: CGFloat = 325
-
     var body: some View {
-        AmpWindowFrame(title: "EQUALIZER", width: eqWidth, height: 0, onClose: { isPresented = false }) {
+        AmpWindowFrame(title: "EQUALIZER", width: AmpChrome.eqPanelWidth, height: 0, onClose: { isPresented = false }) {
             VStack(spacing: 0) {
 
                 // ── Spectrum analyzer display ─────────────────────────────
@@ -161,7 +159,7 @@ struct WinampEQWindow: View {
                         Spacer().frame(width: 24) // offset for dB labels
                         HStack(spacing: 2) {
                             ForEach(0..<10, id: \.self) { i in
-                                EQSpectrumBar(value: viewModel.eqSpectrumData.indices.contains(i) ? viewModel.eqSpectrumData[i] : 0)
+                                EQSpectrumBar(value: live.eqSpectrumData.indices.contains(i) ? live.eqSpectrumData[i] : 0)
                                     .frame(maxWidth: .infinity)
                             }
                         }
@@ -412,7 +410,6 @@ struct WinampEQBand: View {
         }
         .frame(maxWidth: .infinity)
         .onAppear { updateFromViewModel() }
-        .onChange(of: viewModel.eqSpectrumData) { _ in updateFromViewModel() }
         .onReceive(viewModel.objectWillChange) { _ in updateFromViewModel() }
     }
 }
@@ -423,28 +420,48 @@ struct WinampEQBand: View {
 struct WinampPlaylistWindow: View {
     @EnvironmentObject var viewModel: PlayerViewModel
     @Binding var isPresented: Bool
+    /// Match full window width when EQ / settings / etc. sit beside the player (avoids dead space under side panels).
+    var spanWidth: CGFloat = AmpChrome.windowWidth
     @State private var showingFilePicker = false
+    @State private var keyDownMonitor: Any?
 
     var body: some View {
-        AmpWindowFrame(title: "PLAYLIST", width: 275, height: 300, onClose: { isPresented = false }) {
+        AmpWindowFrame(title: "PLAYLIST", width: spanWidth, height: 300, onClose: { isPresented = false }) {
             VStack(spacing: 0) {
                 // Track list
                 BevelBox(style: .inset) {
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            if let pl = viewModel.playlist, !pl.isEmpty() {
+                        if let pl = viewModel.playlist, !pl.isEmpty() {
+                            let current = pl.getCurrentTrackIndex()
+                            LazyVStack(alignment: .leading, spacing: 0) {
                                 ForEach(0..<pl.getLength(), id: \.self) { i in
-                                    WinampPlaylistItem(index: i, playlist: pl, viewModel: viewModel)
+                                    let track = pl.getTrack(at: i)
+                                    let path = track?.path ?? ""
+                                    let title = path.isEmpty ? "—" : URL(fileURLWithPath: path).lastPathComponent
+                                    WinampPlaylistItem(
+                                        index: i,
+                                        title: title,
+                                        isCurrent: current == i,
+                                        isSelected: viewModel.playlistSelectedIndex == i,
+                                        onSelect: {
+                                            viewModel.playlistSelectedIndex = i
+                                            if let t = track {
+                                                try? pl.setCurrentTrackIndex(i)
+                                                viewModel.loadFile(path: t.path)
+                                                DispatchQueue.main.async { viewModel.play() }
+                                            }
+                                        }
+                                    )
                                 }
-                            } else {
-                                HStack {
-                                    Text("⚡ Drop audio files here…")
-                                        .font(.ampMono(8))
-                                        .foregroundColor(AmpColor.textDim)
-                                    Spacer()
-                                }
-                                .padding(8)
                             }
+                        } else {
+                            HStack {
+                                Text("⚡ Drop audio files here…")
+                                    .font(.ampMono(8))
+                                    .foregroundColor(AmpColor.textDim)
+                                Spacer()
+                            }
+                            .padding(8)
                         }
                     }
                     .background(AmpColor.displayBg)
@@ -458,7 +475,7 @@ struct WinampPlaylistWindow: View {
                 VStack(spacing: 3) {
                     HStack(spacing: 3) {
                         AmpButton(label: "ADD",  width: 36, height: 14) { showingFilePicker = true }
-                        AmpButton(label: "REM",  width: 36, height: 14) {}
+                        AmpButton(label: "REM",  width: 36, height: 14) { viewModel.removeSelectedPlaylistItem() }
                         AmpButton(label: "SEL",  width: 36, height: 14) {}
                         Spacer()
                         AmpButton(label: "SORT", width: 36, height: 14) {}
@@ -483,11 +500,49 @@ struct WinampPlaylistWindow: View {
         .fileImporter(isPresented: $showingFilePicker, allowedContentTypes: [.audio], allowsMultipleSelection: true) { result in
             if case .success(let urls) = result {
                 for url in urls {
-                    let _ = url.startAccessingSecurityScopedResource()
+                    let scoped = url.startAccessingSecurityScopedResource()
                     viewModel.addToPlaylist(path: url.path)
+                    if scoped {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    }
                 }
             }
         }
+        .focusable()
+        .onDeleteCommand { viewModel.removeSelectedPlaylistItem() }
+        .onAppear {
+            if viewModel.playlistSelectedIndex == nil {
+                viewModel.playlistSelectedIndex = viewModel.playlist?.getCurrentTrackIndex()
+            }
+            installDeleteKeyMonitor(viewModel: viewModel)
+        }
+        .onDisappear {
+            removeDeleteKeyMonitor()
+        }
+    }
+
+    /// Delete / Forward Delete when typing isn’t active (so text fields keep working).
+    private func installDeleteKeyMonitor(viewModel: PlayerViewModel) {
+        guard keyDownMonitor == nil else { return }
+        keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard event.keyCode == 51 || event.keyCode == 117 else { return event }
+            if let resp = NSApp.keyWindow?.firstResponder, resp is NSTextView || resp is NSTextField {
+                return event
+            }
+            DispatchQueue.main.async {
+                viewModel.removeSelectedPlaylistItem()
+            }
+            return nil
+        }
+    }
+
+    private func removeDeleteKeyMonitor() {
+        if let keyDownMonitor {
+            NSEvent.removeMonitor(keyDownMonitor)
+        }
+        keyDownMonitor = nil
     }
 }
 
@@ -495,14 +550,12 @@ struct WinampPlaylistWindow: View {
 
 struct WinampPlaylistItem: View {
     let index: Int
-    let playlist: Playlist
-    @ObservedObject var viewModel: PlayerViewModel
+    let title: String
+    let isCurrent: Bool
+    var isSelected: Bool = false
+    let onSelect: () -> Void
 
     var body: some View {
-        let current = playlist.getCurrentTrackIndex()
-        let isCurrent = current != nil && current! == index
-        let track = playlist.getTrack(at: index)
-
         HStack(spacing: 0) {
             // Track number
             Text(String(format: "%02d.", index + 1))
@@ -512,7 +565,7 @@ struct WinampPlaylistItem: View {
                 .padding(.trailing, 4)
 
             // Track name
-            Text(URL(fileURLWithPath: track?.path ?? "").lastPathComponent)
+            Text(title)
                 .font(.ampMono(7.5))
                 .foregroundColor(isCurrent ? AmpColor.neonGreen : AmpColor.textBright)
                 .shadow(color: isCurrent ? AmpColor.neonGreen.opacity(0.6) : .clear, radius: 2)
@@ -531,7 +584,7 @@ struct WinampPlaylistItem: View {
         }
         .padding(.vertical, 3)
         .padding(.leading, 4)
-        .background(isCurrent ? AmpColor.panelMid : Color.clear)
+        .background(rowBackground)
         .overlay(
             Rectangle()
                 .fill(isCurrent ? AmpColor.neonGreenDim : Color.clear)
@@ -539,13 +592,13 @@ struct WinampPlaylistItem: View {
             alignment: .leading
         )
         .contentShape(Rectangle())
-        .onTapGesture {
-            if let track {
-                try? playlist.setCurrentTrackIndex(index)
-                viewModel.loadFile(path: track.path)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { viewModel.play() }
-            }
-        }
+        .onTapGesture(perform: onSelect)
+    }
+
+    private var rowBackground: Color {
+        if isCurrent { return AmpColor.panelMid }
+        if isSelected { return AmpColor.panelDark.opacity(0.85) }
+        return Color.clear
     }
 }
 

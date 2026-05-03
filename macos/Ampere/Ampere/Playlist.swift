@@ -55,6 +55,10 @@ class Playlist {
     func saveToPersistence() {
         PlaylistPersistence.savePlaylist(self)
     }
+
+    private func persistPlaybackCursor() {
+        PlaylistPersistence.savePlaybackCursor(from: self)
+    }
     
     func addFile(path: String) throws {
         guard FileManager.default.fileExists(atPath: path) else {
@@ -83,9 +87,24 @@ class Playlist {
         guard index >= 0 && index < entries.count else {
             throw NSError(domain: "Playlist", code: 2, userInfo: [NSLocalizedDescriptionKey: "Index out of range"])
         }
-        
+
         entries.remove(at: index)
+
+        // Keep playback cursor valid after deletion
+        if let ci = currentIndex {
+            if index < ci {
+                currentIndex = ci - 1
+            } else if index == ci {
+                if entries.isEmpty {
+                    currentIndex = nil
+                } else {
+                    currentIndex = min(index, entries.count - 1)
+                }
+            }
+        }
+
         rebuildShuffleOrder()
+        saveToPersistence()
     }
     
     func clear() {
@@ -103,7 +122,7 @@ class Playlist {
             throw NSError(domain: "Playlist", code: 2, userInfo: [NSLocalizedDescriptionKey: "Index out of range"])
         }
         currentIndex = index
-        saveToPersistence() // Save when track changes
+        persistPlaybackCursor()
     }
     
     func getCurrentTrack() -> PlaylistEntry? {
@@ -185,6 +204,7 @@ class Playlist {
     
     func setRepeatMode(_ mode: RepeatMode) {
         repeatMode = mode
+        persistPlaybackCursor()
     }
     
     func getRepeatMode() -> RepeatMode {
@@ -194,6 +214,7 @@ class Playlist {
     func setShuffleMode(_ mode: ShuffleMode) {
         shuffleMode = mode
         rebuildShuffleOrder()
+        persistPlaybackCursor()
     }
     
     func getShuffleMode() -> ShuffleMode {

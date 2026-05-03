@@ -22,6 +22,7 @@ struct PluginContext {
     let playlist: Playlist
     let equalizer: Equalizer
     let viewModel: PlayerViewModel
+    let live: PlayerLiveState
 }
 
 class PluginManager: ObservableObject {
@@ -137,11 +138,11 @@ class AmpereJSBridge: NSObject, AmpereJSBridgeProtocol {
     }
     
     func getPosition() -> Double {
-        return context.viewModel.position
+        return context.live.position
     }
     
     func getDuration() -> Double {
-        return context.viewModel.duration ?? 0.0
+        return context.live.duration ?? 0.0
     }
     
     func loadFile(_ path: String) {

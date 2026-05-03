@@ -55,6 +55,7 @@
 				C760621C2EDC132B008247F2 /* Sources */,
 				C760621D2EDC132B008247F2 /* Frameworks */,
 				C760621E2EDC132B008247F2 /* Resources */,
+				C760622E2EDC132D008247F2 /* LSRegister app (Dock icon cache) */,
 			);
 			buildRules = (
 			);
@@ -113,6 +114,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		C760622E2EDC132D008247F2 /* LSRegister app (Dock icon cache) */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "LSRegister app (Dock icon cache)";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Re-register built .app so Finder/Dock/LS don’t keep a stale icon for the same bundle id.\nAPP=\"${BUILT_PRODUCTS_DIR}/${FULL_PRODUCT_NAME}\"\nif [ -d \"$APP\" ]; then\n  /usr/bin/touch \"$APP\"\n  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f -R -trusted \"$APP\" 2>/dev/null || true\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		C760621C2EDC132B008247F2 /* Sources */ = {

@@ -22,6 +22,17 @@ struct ContentView: View {
     @State private var showingSettings = false
     @State private var showingLyrics   = false
     @State private var showingSearch   = false
+    @State private var showingPro      = false
+
+    /// Total horizontal chrome width (player + optional side panel). Keeps NSWindow matched so hidden title bar doesn’t leave empty side gutters.
+    private var mainWindowRequiredWidth: CGFloat {
+        let base = AmpChrome.windowWidth
+        if showingEQ { return base + AmpChrome.eqPanelWidth }
+        if showingAlbumArt { return base + AmpChrome.albumArtPanelWidth }
+        if showingSettings { return base + AmpChrome.settingsPanelWidth }
+        if showingSearch { return base + AmpChrome.searchPanelWidth }
+        return base
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -33,7 +44,8 @@ struct ContentView: View {
                     showingSettings: $showingSettings,
                     showingAlbumArt: $showingAlbumArt,
                     showingLyrics:   $showingLyrics,
-                    showingSearch:   $showingSearch
+                    showingSearch:   $showingSearch,
+                    showingPro:      $showingPro
                 )
                 .environmentObject(viewModel)
                 .layoutPriority(1)
@@ -60,19 +72,27 @@ struct ContentView: View {
 
             // ── Bottom: playlist / lyrics panel ────────────────────────────
             if showingPlaylist {
-                WinampPlaylistWindow(isPresented: $showingPlaylist)
+                WinampPlaylistWindow(isPresented: $showingPlaylist, spanWidth: mainWindowRequiredWidth)
                     .environmentObject(viewModel)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
             if showingLyrics {
-                WinampLyricsWindow(isPresented: $showingLyrics)
+                WinampLyricsWindow(isPresented: $showingLyrics, spanWidth: mainWindowRequiredWidth)
+                    .environmentObject(viewModel)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            if showingPro {
+                WinampProPanel(isPresented: $showingPro, spanWidth: mainWindowRequiredWidth)
                     .environmentObject(viewModel)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .fixedSize()
+        .frame(width: mainWindowRequiredWidth, alignment: .leading)
+        .fixedSize(horizontal: true, vertical: false)
         .clipped()
+        .ignoresSafeArea(.container, edges: [.horizontal, .top])
         // Apply skin to the entire tree so AmpColor._skin stays in sync
         .applySkin(themeManager)
         .animation(.easeInOut(duration: 0.18), value: showingEQ)
@@ -81,7 +101,9 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.18), value: showingSettings)
         .animation(.easeInOut(duration: 0.18), value: showingLyrics)
         .animation(.easeInOut(duration: 0.18), value: showingSearch)
+        .animation(.easeInOut(duration: 0.18), value: showingPro)
         .animation(.easeInOut(duration: 0.25), value: themeManager.activeTheme)
         .borderlessWindow()
+        .background(MainWindowWidthSync(requiredWidth: mainWindowRequiredWidth))
     }
 }

@@ -14,12 +14,13 @@ class PlayerViewModel: ObservableObject {
     @Published var state: PlayerState = .stopped
     @Published var volume: Float = 1.0
     @Published var currentFile: String? = nil
-    @Published var position: Double = 0.0
-    @Published var duration: Double? = nil
     @Published var playlist: Playlist? = nil
+    /// Highlighted row for REM / Delete (defaults to current track when unset).
+    @Published var playlistSelectedIndex: Int? = nil
     @Published var metadata: AudioMetadata = AudioMetadata()
-    @Published var spectrumData: [Float] = Array(repeating: 0.0, count: 20)
-    @Published var eqSpectrumData: [Float] = Array(repeating: 0.0, count: 10)
+
+    /// Position, duration, spectrum — updated at high frequency; isolated so playlist/static UI does not redraw every tick.
+    let live: PlayerLiveState
     
     // EQ Presets
     struct EQPreset: Identifiable, Hashable {
@@ -67,6 +68,7 @@ class PlayerViewModel: ObservableObject {
     }
     
     init() {
+        live = PlayerLiveState()
         // Initialize all basic properties first
         player = AudioPlayer()
         eq = Equalizer()
@@ -90,7 +92,8 @@ class PlayerViewModel: ObservableObject {
             player: localPlayer,
             playlist: newPlaylist,
             equalizer: localEq,
-            viewModel: self
+            viewModel: self,
+            live: live
         )
         pluginManager = PluginManager(context: pluginContext)
         
@@ -109,21 +112,21 @@ class PlayerViewModel: ObservableObject {
         
         player.$position
             .receive(on: DispatchQueue.main)
-            .assign(to: &$position)
+            .assign(to: &live.$position)
         
         player.$duration
             .receive(on: DispatchQueue.main)
-            .assign(to: &$duration)
+            .assign(to: &live.$duration)
         
         // Observe spectrum data
         visualizer.$spectrumData
             .receive(on: DispatchQueue.main)
-            .assign(to: &$spectrumData)
+            .assign(to: &live.$spectrumData)
         
         // Observe EQ spectrum data
         eqAnalyzer?.$frequencyBands
             .receive(on: DispatchQueue.main)
-            .assign(to: &$eqSpectrumData)
+            .assign(to: &live.$eqSpectrumData)
         
         // Start/stop visualization based on playback state
         $state
@@ -140,6 +143,8 @@ class PlayerViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        visualizer.startVisualization(isPlaying: false)
         
         // Observe track end notification
         NotificationCenter.default.addObserver(
@@ -328,9 +333,40 @@ class PlayerViewModel: ObservableObject {
         }
         do {
             try playlist.addFile(path: path)
+            notifyPlaylistUIChanged()
         } catch {
             print("Failed to add to playlist: \(error)")
         }
+    }
+
+    /// Removes one playlist row and refreshes playback if the loaded file was removed.
+    func removeFromPlaylist(at index: Int) {
+        guard let playlist = playlist else { return }
+        let removedPath = playlist.getTrack(at: index)?.path
+        let wasCurrent = (removedPath != nil && removedPath == currentFile)
+        do {
+            try playlist.removeFile(at: index)
+            notifyPlaylistUIChanged()
+            playlistSelectedIndex = playlist.getCurrentTrackIndex()
+            if wasCurrent {
+                if let next = playlist.getCurrentTrack() {
+                    loadFile(path: next.path)
+                } else {
+                    stop()
+                    metadata = AudioMetadata()
+                }
+            }
+        } catch {
+            print("Failed to remove from playlist: \(error)")
+        }
+    }
+
+    /// REM button / Delete key — removes selected row, or current track if none selected.
+    func removeSelectedPlaylistItem() {
+        guard let pl = playlist, pl.getLength() > 0 else { return }
+        let idx = playlistSelectedIndex ?? pl.getCurrentTrackIndex() ?? 0
+        guard idx >= 0 && idx < pl.getLength() else { return }
+        removeFromPlaylist(at: idx)
     }
     
     func playNext() {
@@ -381,6 +417,11 @@ class PlayerViewModel: ObservableObject {
         player.seek(to: position)
     }
     
+    /// Call after mutating `playlist` in ways that don't replace the optional (repeat/shuffle/current index).
+    func notifyPlaylistUIChanged() {
+        objectWillChange.send()
+    }
+
     private func handleTrackEnd() {
         guard let playlist = playlist else { return }
         let repeatMode = playlist.getRepeatMode()

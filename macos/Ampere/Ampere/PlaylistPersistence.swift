@@ -46,8 +46,20 @@ class PlaylistPersistence {
         // Save shuffle mode
         let shuffleMode = playlist.getShuffleMode()
         userDefaults.set(shuffleMode == .on ? "on" : "off", forKey: shuffleModeKey)
-        
-        userDefaults.synchronize()
+    }
+
+    /// Writes only playback cursor + modes (no track list). Fast path for selection changes.
+    static func savePlaybackCursor(from playlist: Playlist) {
+        let userDefaults = UserDefaults.standard
+        if let currentIndex = playlist.getCurrentTrackIndex() {
+            userDefaults.set(currentIndex, forKey: currentIndexKey)
+        } else {
+            userDefaults.removeObject(forKey: currentIndexKey)
+        }
+        let repeatMode = playlist.getRepeatMode()
+        userDefaults.set(repeatMode == .all ? "all" : (repeatMode == .one ? "one" : "none"), forKey: repeatModeKey)
+        let shuffleMode = playlist.getShuffleMode()
+        userDefaults.set(shuffleMode == .on ? "on" : "off", forKey: shuffleModeKey)
     }
     
     static func loadPlaylist() -> (tracks: [PlaylistEntry], currentIndex: Int?, repeatMode: RepeatMode, shuffleMode: ShuffleMode) {

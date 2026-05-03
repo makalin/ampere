@@ -11,26 +11,32 @@ import UniformTypeIdentifiers
 
 struct WinampPlayerView: View {
     @EnvironmentObject var viewModel: PlayerViewModel
+    @EnvironmentObject var live: PlayerLiveState
     @Binding var showingEQ: Bool
     @Binding var showingPlaylist: Bool
     @Binding var showingSettings: Bool
     @Binding var showingAlbumArt: Bool
     @Binding var showingLyrics: Bool
     @Binding var showingSearch: Bool
+    @Binding var showingPro: Bool
     @State private var showingFilePicker = false
     @State private var isDragging = false
+    /// While scrubbing, show this position so the timer doesn’t fight the thumb.
+    @State private var seekPreviewSeconds: Double?
 
     var body: some View {
-        VStack(spacing: 0) {
+        // Leading alignment: rows narrower than 304pt were centered by default VStack and showed side gutters.
+        VStack(alignment: .leading, spacing: 0) {
             titleBar
             displayPanel
             seekAndTime
             controlBar
             bottomBar
         }
-        .frame(width: 275, height: 116)
+        .frame(width: AmpChrome.windowWidth, height: 116, alignment: .topLeading)
         .background(AmpColor.panelDeep)
-        .shadow(color: .black.opacity(0.7), radius: 10, x: 2, y: 4)
+        // Keep blur tight — large bottom-offset shadow reads as a gap above the playlist.
+        .shadow(color: .black.opacity(0.55), radius: 5, x: 0, y: 2)
         .onDrop(of: [.fileURL], isTargeted: nil, perform: handleDrop)
         .fileImporter(
             isPresented: $showingFilePicker,
@@ -95,6 +101,9 @@ struct WinampPlayerView: View {
             Rectangle().fill(AmpColor.bevelShadow).frame(height: 1),
             alignment: .bottom
         )
+        .frame(width: AmpChrome.windowWidth, alignment: .leading)
+        .gesture(WindowDragGesture())
+        .allowsWindowActivationEvents(true)
     }
 
     private func titleBarButton(color: Color, action: @escaping () -> Void) -> some View {
@@ -124,41 +133,46 @@ struct WinampPlayerView: View {
             // Left: mini spectrum
             BevelBox(style: .inset) {
                 MiniSpectrumView(
-                    bands: Array(viewModel.spectrumData.prefix(10)),
-                    barWidth: 2,
-                    maxHeight: 24
+                    bands: miniSpectrumBands,
+                    isActive: viewModel.state == .playing
                 )
-                .frame(width: 26, height: 24)
+                .frame(width: 22, height: 24)
                 .background(AmpColor.displayBg)
+                .clipped()
             }
-            .padding(.leading, 4)
+            .padding(.leading, 2)
             .padding(.vertical, 3)
 
-            // Center: track info LCD
+            // Center: LCD fills all space between spectrum and bitrate columns
             BevelBox(style: .inset) {
-                ZStack {
-                    LcdBackground()
-                    VStack(alignment: .leading, spacing: 1) {
-                        // Scrolling title
-                        MarqueeText(
-                            text: displayTitle,
-                            font: .ampMono(8, weight: .semibold),
-                            color: AmpColor.neonGreen,
-                            width: 148
-                        )
-                        // Artist
-                        Text(displayArtist)
-                            .font(.ampMono(6.5))
-                            .foregroundColor(AmpColor.textMid)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                GeometryReader { geo in
+                    let innerW = max(40, geo.size.width - 8)
+                    ZStack(alignment: .topLeading) {
+                        LcdBackground()
+                            .frame(width: geo.size.width, height: geo.size.height)
+                        VStack(alignment: .leading, spacing: 1) {
+                            MarqueeText(
+                                text: displayTitle,
+                                font: .ampMono(8, weight: .semibold),
+                                color: AmpColor.neonGreen,
+                                width: innerW
+                            )
+                            Text(displayArtist)
+                                .font(.ampMono(6.5))
+                                .foregroundColor(AmpColor.textMid)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .frame(width: geo.size.width, alignment: .leading)
                     }
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 2)
                 }
-                .frame(width: 156, height: 28)
+                .frame(height: 28)
             }
-            .padding(.horizontal, 3)
+            .frame(maxWidth: .infinity)
+            .padding(.leading, 2)
             .padding(.vertical, 3)
 
             // Right: bit/kHz readout
@@ -175,26 +189,29 @@ struct WinampPlayerView: View {
                         .font(.ampMono(6, weight: .bold))
                         .foregroundColor(AmpColor.amber)
                 }
-                .frame(width: 36, height: 28)
+                .frame(width: 30, height: 28)
                 .background(AmpColor.displayBg)
             }
-            .padding(.trailing, 4)
+            .padding(.trailing, 2)
             .padding(.vertical, 3)
         }
-        .frame(height: 34)
+        .frame(width: AmpChrome.windowWidth, height: 34, alignment: .leading)
         .background(AmpColor.panelDark)
         .overlay(Rectangle().fill(AmpColor.bevelShadow).frame(height: 1), alignment: .bottom)
+        .gesture(WindowDragGesture())
+        .allowsWindowActivationEvents(true)
     }
 
     // ─── Seek + Time ─────────────────────────────────────────────────────────
 
     private var seekAndTime: some View {
-        HStack(spacing: 4) {
-            // Current time
-            LedDigitDisplay(text: formatTime(viewModel.position), size: 10)
-                .frame(width: 38, alignment: .trailing)
+        let shownPosition = seekPreviewSeconds ?? live.position
+        return HStack(spacing: 2) {
+            // Current time — compact so the scrub bar uses the full middle
+            LedDigitDisplay(text: formatTime(shownPosition), size: 10)
+                .frame(width: 32, alignment: .trailing)
 
-            // Progress track — inset bevel
+            // Progress track — grows with row width (fills space between clocks)
             BevelBox(style: .inset) {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -203,8 +220,8 @@ struct WinampPlayerView: View {
 
                         // Filled portion
                         let progress: CGFloat = {
-                            guard let dur = viewModel.duration, dur > 0 else { return 0 }
-                            return min(1, max(0, CGFloat(viewModel.position / dur)))
+                            guard let dur = live.duration, dur > 0 else { return 0 }
+                            return min(1, max(0, CGFloat(shownPosition / dur)))
                         }()
 
                         if progress > 0 {
@@ -216,7 +233,7 @@ struct WinampPlayerView: View {
                         }
 
                         // Thumb knob
-                        if let dur = viewModel.duration, dur > 0 {
+                        if let dur = live.duration, dur > 0 {
                             let thumbX = geo.size.width * progress - 4
                             ZStack {
                                 Rectangle().fill(AmpColor.panelLight).frame(width: 8, height: 10)
@@ -234,28 +251,34 @@ struct WinampPlayerView: View {
                         }
                     }
                     .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
+                    .highPriorityGesture(
+                        DragGesture(minimumDistance: 0, coordinateSpace: .local)
                             .onChanged { val in
                                 isDragging = true
-                                if let dur = viewModel.duration, dur > 0 {
-                                    let pos = Double(val.location.x / geo.size.width) * dur
-                                    viewModel.seek(to: max(0, min(pos, dur)))
-                                }
+                                let w = geo.size.width
+                                guard w > 1, let dur = live.duration, dur > 0 else { return }
+                                let pos = Double(val.location.x / w) * dur
+                                let clamped = max(0, min(pos, dur))
+                                seekPreviewSeconds = clamped
+                                viewModel.seek(to: clamped)
                             }
-                            .onEnded { _ in isDragging = false }
+                            .onEnded { _ in
+                                isDragging = false
+                                seekPreviewSeconds = nil
+                            }
                     )
                 }
                 .frame(height: 10)
             }
+            .frame(maxWidth: .infinity)
 
             // Total time
-            LedDigitDisplay(text: formatTime(viewModel.duration ?? 0), size: 10)
-                .frame(width: 38, alignment: .leading)
+            LedDigitDisplay(text: formatTime(live.duration ?? 0), size: 10)
+                .frame(width: 32, alignment: .leading)
         }
-        .padding(.horizontal, 5)
+        .padding(.horizontal, 2)
         .padding(.vertical, 4)
-        .frame(height: 20)
+        .frame(width: AmpChrome.windowWidth, height: 20, alignment: .leading)
         .background(AmpColor.panelDark)
         .overlay(Rectangle().fill(AmpColor.bevelShadow).frame(height: 1), alignment: .bottom)
     }
@@ -296,7 +319,12 @@ struct WinampPlayerView: View {
             AmpButton(icon: "forward.fill",        width: 22, height: 18) { viewModel.playNext() }
             AmpButton(icon: "forward.end.fill",    width: 22, height: 18) { viewModel.playNext() }
 
-            Spacer()
+            Color.clear
+                .frame(minHeight: 18)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .gesture(WindowDragGesture())
+                .allowsWindowActivationEvents(true)
 
             // Volume knob area
             HStack(spacing: 3) {
@@ -329,9 +357,9 @@ struct WinampPlayerView: View {
                     .foregroundColor(AmpColor.textDim)
             }
         }
-        .padding(.horizontal, 5)
+        .padding(.horizontal, 3)
         .padding(.vertical, 3)
-        .frame(height: 26)
+        .frame(width: AmpChrome.windowWidth, height: 26, alignment: .leading)
         .background(
             LinearGradient(
                 colors: [AmpColor.panelMid, AmpColor.panelDark],
@@ -351,9 +379,15 @@ struct WinampPlayerView: View {
             AmpButton(label: "ART",  isActive: showingAlbumArt, width: 28, height: 14) { showingAlbumArt.toggle() }
             AmpButton(label: "SET",  width: 28, height: 14) { showingSettings.toggle() }
             AmpButton(label: "LYR",  width: 28, height: 14) { showingLyrics.toggle() }
-            AmpButton(label: "SRCH", width: 32, height: 14) { showingSearch.toggle() }
+            AmpButton(label: "SRCH", width: 28, height: 14) { showingSearch.toggle() }
+            AmpButton(label: "PRO", isActive: showingPro, width: 26, height: 14) { showingPro.toggle() }
 
-            Spacer()
+            Color.clear
+                .frame(height: 14)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .gesture(WindowDragGesture())
+                .allowsWindowActivationEvents(true)
 
             // Shuffle / Repeat LED indicators
             HStack(spacing: 3) {
@@ -371,9 +405,9 @@ struct WinampPlayerView: View {
             }
             .padding(.trailing, 4)
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 3)
         .padding(.vertical, 2)
-        .frame(height: 22)
+        .frame(width: AmpChrome.windowWidth, height: 22, alignment: .leading)
         .background(
             LinearGradient(
                 colors: [AmpColor.panelDark, AmpColor.panelDeep],
@@ -383,6 +417,17 @@ struct WinampPlayerView: View {
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    /// Five downsampled bands (0…1) for the mini spectrum; matches `AudioVisualizer` bin count.
+    private var miniSpectrumBands: [Float] {
+        let src = Array(live.spectrumData.prefix(20))
+        guard src.count >= 20 else { return Array(repeating: 0, count: 5) }
+        return (0..<5).map { k in
+            let lo = k * 4
+            let chunk = src[lo..<(lo + 4)]
+            return chunk.reduce(0, +) / 4
+        }
+    }
 
     private var displayTitle: String {
         if let t = viewModel.metadata.title, !t.isEmpty { return t }
